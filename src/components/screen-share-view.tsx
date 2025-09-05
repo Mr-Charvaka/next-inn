@@ -16,10 +16,10 @@ export default function ScreenShareView({ stream }: ScreenShareViewProps) {
   }, [stream]);
 
   return (
-    <div className="w-full h-full bg-black rounded-xl overflow-hidden">
+    <div className="w-full h-full bg-card p-4">
       <video
         ref={videoRef}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain rounded-lg"
         autoPlay
         playsInline
       />

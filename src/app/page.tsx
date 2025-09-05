@@ -1,48 +1,50 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
 import ChatPanel from "@/components/chat-panel";
 import ScreenShareView from "@/components/screen-share-view";
 import { useToast } from "@/hooks/use-toast";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { Video, Edit3, MessageCircle, ScreenShare, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+type ViewMode = "video" | "draw" | "share";
 
 export default function Home() {
-  const [participantCount, setParticipantCount] = useState(600);
-  const [isChatEnabled, setIsChatEnabled] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("video");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setParticipantCount((prevCount) => {
-        const fluctuation = Math.floor(Math.random() * 21) - 10; // -10 to +10
-        const newCount = prevCount + fluctuation;
-        return newCount > 500 ? newCount : 500 + Math.floor(Math.random() * 20); // Ensure count stays high
-      });
-    }, 3000); // Update every 3 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
   const handleScreenShareToggle = async () => {
-    if (isScreenSharing) {
+    if (viewMode === 'share') {
       screenStream?.getTracks().forEach((track) => track.stop());
       setScreenStream(null);
-      setIsScreenSharing(false);
+      setViewMode('video');
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: true,
         });
-        setScreenStream(stream);
-        setIsScreenSharing(true);
         stream.getVideoTracks()[0].onended = () => {
             setScreenStream(null);
-            setIsScreenSharing(false);
+            setViewMode('video');
         };
+        setScreenStream(stream);
+        setViewMode('share');
       } catch (error) {
         console.error("Screen share error:", error);
         toast({
@@ -50,33 +52,94 @@ export default function Home() {
           title: "Screen Share Failed",
           description: "Could not start screen sharing. Please check permissions.",
         });
-        setIsScreenSharing(false);
+        setViewMode('video');
       }
     }
   };
 
+  const renderView = () => {
+    switch(viewMode) {
+      case 'share':
+        return screenStream ? <ScreenShareView stream={screenStream} /> : <div className="flex items-center justify-center h-full text-muted-foreground">No screen share stream.</div>;
+      case 'draw':
+        return <DrawingCanvas />;
+      case 'video':
+      default:
+        // Placeholder for video grid
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 h-full overflow-auto">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-card rounded-lg flex items-center justify-center aspect-video">
+                <Users className="w-16 h-16 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        );
+    }
+  }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background">
-      <AppHeader
-        participantCount={participantCount}
-        isChatEnabled={isChatEnabled}
-        onChatToggle={setIsChatEnabled}
-        isScreenSharing={isScreenSharing}
-        onScreenShareToggle={handleScreenShareToggle}
-      />
-      <main className="flex flex-1 overflow-hidden">
-        <div className="flex-1 p-4 md:p-6 lg:p-8 flex flex-col">
-          <div className="relative flex-1 w-full h-full rounded-xl shadow-lg">
-             {isScreenSharing && screenStream ? (
-                <ScreenShareView stream={screenStream} />
-             ) : (
-                <DrawingCanvas />
-             )}
+    <div className="flex h-screen w-full flex-col bg-background text-foreground">
+      <AppHeader />
+      <div className="flex flex-1 overflow-hidden">
+        <nav className="flex flex-col items-center gap-4 py-4 px-2 bg-card border-r">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('video')}>
+                  <Video className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Video Grid</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('draw')}>
+                  <Edit3 className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Whiteboard</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={viewMode === 'share' ? 'secondary' : 'ghost'} size="icon" onClick={handleScreenShareToggle}>
+                  <ScreenShare className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Screen Share</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <div className="mt-auto">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={isChatOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setIsChatOpen(!isChatOpen)}>
+                    <MessageCircle className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right"><p>Toggle Chat</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-        </div>
-        <ChatPanel isChatEnabled={isChatEnabled} />
-      </main>
+        </nav>
+        <main className="flex-1 flex flex-col">
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            <ResizablePanel defaultSize={75}>
+              <div className="flex-1 h-full">
+                {renderView()}
+              </div>
+            </ResizablePanel>
+            {isChatOpen && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                  <ChatPanel />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        </main>
+      </div>
     </div>
   );
 }
