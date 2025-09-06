@@ -12,7 +12,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users } from "lucide-react";
+import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users, LayoutGrid, UserSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -29,8 +29,10 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 type ViewMode = "video" | "draw" | "share";
+type VideoLayout = "speaker" | "grid";
 
 type Participant = {
   id: number;
@@ -79,7 +81,7 @@ const participantNames = [
     "Ishrat Shetty", "Rohail Shetty", "Reshma Pawar", "Sahil Pawar", "Rupashree Krishna", "Chiranjeev Krishna", "Vaishnavi Sharma", "Harinder Sharma", "Janhavi Singh", "Shivraj Singh", "Ketaki Iyer", "Ashwath Iyer", "Rituparna Reddy", 
     "Iqbal Reddy", "Kajri Nair", "Sarfaraz Nair", "Radhiya Choudhary", "Rizwan Choudhary", "Lopa Desai", "Nandkishore Desai", "Shruti Patel", "Ashwin Patel", "Poonam Mehta", "Krunal Mehta", "Prachi Rajput", "Ansh Rajput", 
     "Seher Goyal", "Vishnu Goyal", "Shruthi Malhotra", "Lokesh Malhotra", "Aakanksha Gupta", "Rasik Gupta", "Kshama Menon", "Shravan Menon", "Amreen Joshi", "Surya Joshi", "Shagufta Agarwal", "Sunil Agarwal", "Noorjahan Bansal", 
-    "Mahesh Bansal", "Nahid Rathore", "Lokendra Rathore", "Sitara Verma", "Tayyab Verma", "Almas Pillai", "Mustafa Pillai", "Mahima Kulkarni", "Sreekant Kulkarni", "Sumedha Jadhav", "Amrit Jadhav", "Padma Shetty", "Salman Shetty", 
+    "Mahesh Bansal", "Nahid Rathore", "Lokendra Rathore", "Sitara Verma", "Tayyab Verma", "Almas Pillai", "Mustafa Pillai", "Mahima Kulkarni", "Sreekant Kulkarni", "Sumedha Jadhav", "Amrit Jadhav", "Padma Shetty", "Salman Shetty",
     "Aaruni Pawar", "Divyansh Pawar", "Aanchal Krishna", "Chinmay Krishna", "Navya Sharma", "Ankur Sharma", "Ira Singh", "Tushar Singh", "Ahana Iyer", "Harith Iyer", "Nitya Reddy", "Danish Reddy", "Anvi Nair", "Roshan Nair", 
     "Kriti Choudhary", "Arshad Choudhary", "Sejal Desai", "Rupesh Desai", "Diya Patel", "Hemant Patel", "Charita Mehta", "Rajiv Mehta", "Oviya Rajput", "Ravindra Rajput", "Amna Goyal", "Praveen Goyal", "Snehal Malhotra", 
     "Om Malhotra", "Kushi Gupta", "Alok Gupta", "Shanaya Menon", "Santosh Menon", "Aaratrika Joshi", "Sandeep Joshi", "Bhoomi Agarwal", "Dhiraj Agarwal", "Eesha Bansal", "Jatin Bansal", "Ishwari Rathore", "Rituraj Rathore", 
@@ -123,6 +125,7 @@ const allParticipants = generateParticipants();
 export default function MeetingPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("video");
+  const [videoLayout, setVideoLayout] = useState<VideoLayout>('speaker');
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
@@ -344,12 +347,15 @@ export default function MeetingPage() {
   };
 
   const toggleMic = (id: number) => {
+    if (id !== 0) return; // only allow host to toggle
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, isMicOn: !p.isMicOn } : p));
   };
 
   const toggleVideo = (id: number) => {
+    if (id !== 0) return; // only allow host to toggle
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, isVideoOn: !p.isVideoOn } : p));
   };
+
 
   const handleOpenPolls = () => {
     window.open('/polls', '_blank', 'width=500,height=700,resizable=yes,scrollbars=yes');
@@ -423,6 +429,98 @@ export default function MeetingPage() {
     </div>
   )};
 
+  const renderVideoView = () => {
+    if (videoLayout === 'grid') {
+      return (
+        <ScrollArea className="h-full w-full">
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {host && <ParticipantCard participant={host} isHostCard={true} />}
+              {otherParticipants.map((p) => (
+                  <ParticipantCard key={p.id} participant={p} />
+              ))}
+          </div>
+        </ScrollArea>
+      );
+    }
+    
+    // Speaker view
+    return (
+       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+          <ResizablePanel defaultSize={75}>
+            <div className="flex items-center justify-center h-full w-full p-4">
+              {host && <ParticipantCard participant={host} isHostCard={true} />}
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
+            <ScrollArea className="h-full w-full">
+              <div className="p-4 space-y-4">
+                {otherParticipants.slice(0,10).map((p) => (
+                  <ParticipantCard key={p.id} participant={p} />
+                ))}
+                <Dialog open={isParticipantListOpen} onOpenChange={setIsParticipantListOpen}>
+                  <DialogTrigger asChild>
+                    <button className="bg-secondary rounded-lg w-full flex items-center justify-center aspect-video relative overflow-hidden group cursor-pointer hover:bg-primary/10 border-2 border-dashed border-primary/20 hover:border-primary/50 transition-colors">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <Users className="h-10 w-10" />
+                            <span>View All ({participants.length})</span>
+                        </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>All Participants ({participants.length})</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="flex-1 -mr-6">
+                      <div className="space-y-4 pr-6">
+                        {participants.map(p => (
+                          <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
+                            <div className="flex items-center gap-4">
+                              <Avatar>
+                                 <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
+                                    {p.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>{p.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                               {p.id === 0 ? (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                          <Label htmlFor={`mic-switch-${p.id}`} className="text-sm">Mic</Label>
+                                          <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>
+                                          <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
+                                      </div>
+                                    </>
+                                ) : (
+                                    <>
+                                      <div className="flex items-center gap-2 text-muted-foreground">
+                                        <MicOff className="h-4 w-4" />
+                                        <span className="text-sm">Mic Off</span>
+                                      </div>
+                                       <div className="flex items-center gap-2 text-muted-foreground">
+                                        <VideoOff className="h-4 w-4" />
+                                        <span className="text-sm">Video Off</span>
+                                      </div>
+                                    </>
+                                )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </ScrollArea>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+    );
+  }
+
   const renderView = () => {
     switch(viewMode) {
       case 'share':
@@ -431,81 +529,7 @@ export default function MeetingPage() {
         return <DrawingCanvas />;
       case 'video':
       default:
-        return (
-          <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-            <ResizablePanel defaultSize={75}>
-              <div className="flex items-center justify-center h-full w-full p-4">
-                {host && <ParticipantCard participant={host} isHostCard={true} />}
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
-              <ScrollArea className="h-full w-full">
-                <div className="p-4 space-y-4">
-                  {otherParticipants.slice(0,10).map((p) => (
-                    <ParticipantCard key={p.id} participant={p} />
-                  ))}
-                  <Dialog open={isParticipantListOpen} onOpenChange={setIsParticipantListOpen}>
-                    <DialogTrigger asChild>
-                      <button className="bg-secondary rounded-lg w-full flex items-center justify-center aspect-video relative overflow-hidden group cursor-pointer hover:bg-primary/10 border-2 border-dashed border-primary/20 hover:border-primary/50 transition-colors">
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                              <Users className="h-10 w-10" />
-                              <span>View All ({participants.length})</span>
-                          </div>
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle>All Participants ({participants.length})</DialogTitle>
-                      </DialogHeader>
-                      <ScrollArea className="flex-1 -mr-6">
-                        <div className="space-y-4 pr-6">
-                          {participants.map(p => (
-                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
-                              <div className="flex items-center gap-4">
-                                <Avatar>
-                                   <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
-                                      {p.name.split(' ').map(n => n[0]).join('')}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span>{p.name}</span>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                 {p.id === 0 ? (
-                                      <>
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor={`mic-switch-${p.id}`} className="text-sm">Mic</Label>
-                                            <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>
-                                            <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
-                                        </div>
-                                      </>
-                                  ) : (
-                                      <>
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                          <MicOff className="h-4 w-4" />
-                                          <span className="text-sm">Mic Off</span>
-                                        </div>
-                                         <div className="flex items-center gap-2 text-muted-foreground">
-                                          <VideoOff className="h-4 w-4" />
-                                          <span className="text-sm">Video Off</span>
-                                        </div>
-                                      </>
-                                  )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </ScrollArea>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        );
+        return renderVideoView();
     }
   }
 
@@ -532,8 +556,28 @@ export default function MeetingPage() {
                     <Video className="h-6 w-6" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top"><p>Video Grid</p></TooltipContent>
+                <TooltipContent side="top"><p>Video</p></TooltipContent>
               </Tooltip>
+              {viewMode === 'video' && (
+                <>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant={videoLayout === 'speaker' ? 'secondary' : 'ghost'} size="icon" onClick={() => setVideoLayout('speaker')}>
+                          <UserSquare className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>Speaker View</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant={videoLayout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setVideoLayout('grid')}>
+                          <LayoutGrid className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>Grid View</p></TooltipContent>
+                  </Tooltip>
+                </>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('draw')}>
@@ -580,5 +624,3 @@ export default function MeetingPage() {
     </>
   );
 }
-
-    
