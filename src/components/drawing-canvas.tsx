@@ -16,7 +16,8 @@ type DrawingAction = {
   points: Point[];
 };
 
-type InteractionMode = 'none' | 'drawing' | 'panning' | 'selecting' | 'moving';
+type HandlePosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'top' | 'right' | 'bottom' | 'left';
+type InteractionMode = 'none' | 'drawing' | 'panning' | 'selecting' | 'moving' | 'resizing';
 type BoundingBox = { minX: number; minY: number; maxX: number; maxY: number };
 
 const getActionBoundingBox = (action: DrawingAction): BoundingBox => {
@@ -34,6 +35,19 @@ const getActionBoundingBox = (action: DrawingAction): BoundingBox => {
   };
 };
 
+const getCombinedBoundingBox = (actions: DrawingAction[]): BoundingBox | null => {
+    if (actions.length === 0) return null;
+    const boxes = actions.map(getActionBoundingBox);
+    return {
+        minX: Math.min(...boxes.map(b => b.minX)),
+        minY: Math.min(...boxes.map(b => b.minY)),
+        maxX: Math.max(...boxes.map(b => b.maxX)),
+        maxY: Math.max(...boxes.map(b => b.maxY)),
+    };
+};
+
+const HANDLE_SIZE = 8;
+
 export default function DrawingCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
@@ -49,6 +63,8 @@ export default function DrawingCanvas() {
 
   const [selectedActionIds, setSelectedActionIds] = useState<Set<number>>(new Set());
   const [selectionBox, setSelectionBox] = useState<{start: Point, end: Point} | null>(null);
+  const [resizingHandle, setResizingHandle] = useState<HandlePosition | null>(null);
+  const [hoveredHandle, setHoveredHandle] = useState<HandlePosition | null>(null);
 
   const colors = ['#FFFFFF', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6', '#A855F7'];
 
@@ -108,10 +124,36 @@ export default function DrawingCanvas() {
     }
   };
 
+  const getResizeHandles = (box: BoundingBox): Record<HandlePosition, BoundingBox> => {
+    const dpr = window.devicePixelRatio || 1;
+    const size = HANDLE_SIZE / dpr * 2;
+    return {
+      topLeft: { minX: box.minX - size / 2, minY: box.minY - size / 2, maxX: box.minX + size / 2, maxY: box.minY + size / 2 },
+      topRight: { minX: box.maxX - size / 2, minY: box.minY - size / 2, maxX: box.maxX + size / 2, maxY: box.minY + size / 2 },
+      bottomLeft: { minX: box.minX - size / 2, minY: box.maxY - size / 2, maxX: box.minX + size / 2, maxY: box.maxY + size / 2 },
+      bottomRight: { minX: box.maxX - size / 2, minY: box.maxY - size / 2, maxX: box.maxX + size / 2, maxY: box.maxY + size / 2 },
+      top: { minX: box.minX + (box.maxX - box.minX) / 2 - size / 2, minY: box.minY - size / 2, maxX: box.minX + (box.maxX - box.minX) / 2 + size / 2, maxY: box.minY + size / 2 },
+      right: { minX: box.maxX - size / 2, minY: box.minY + (box.maxY - box.minY) / 2 - size / 2, maxX: box.maxX + size / 2, maxY: box.minY + (box.maxY - box.minY) / 2 + size / 2 },
+      bottom: { minX: box.minX + (box.maxX - box.minX) / 2 - size / 2, minY: box.maxY - size / 2, maxX: box.minX + (box.maxX - box.minX) / 2 + size / 2, maxY: box.maxY + size / 2 },
+      left: { minX: box.minX - size / 2, minY: box.minY + (box.maxY - box.minY) / 2 - size / 2, maxX: box.minX + size / 2, maxY: box.minY + (box.maxY - box.minY) / 2 + size / 2 },
+    };
+  };
+
+  const getHandleAtPoint = (point: Point, box: BoundingBox): HandlePosition | null => {
+    const handles = getResizeHandles(box);
+    for (const [position, handleBox] of Object.entries(handles)) {
+      if (isPointInsideBox(point, handleBox)) {
+        return position as HandlePosition;
+      }
+    }
+    return null;
+  };
+
   const redrawCanvas = useCallback(() => {
     const context = getCanvasContext();
     const canvas = canvasRef.current;
     if (!context || !canvas) return;
+    const dpr = window.devicePixelRatio || 1;
 
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = '#000000';
@@ -124,16 +166,22 @@ export default function DrawingCanvas() {
     activeHistory.forEach(action => drawAction(context, action));
     
     // Draw selection highlights
-    context.strokeStyle = '#3B82F6';
-    context.setLineDash([6, 3]);
-    context.lineWidth = 1;
-    activeHistory.forEach(action => {
-      if (selectedActionIds.has(action.id)) {
-        const { minX, minY, maxX, maxY } = getActionBoundingBox(action);
-        context.strokeRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
-      }
-    });
-    context.setLineDash([]);
+    const selectedActions = activeHistory.filter(a => selectedActionIds.has(a.id));
+    if (selectedActions.length > 0) {
+        const selectionBox = getCombinedBoundingBox(selectedActions);
+        if (selectionBox) {
+            context.strokeStyle = '#3B82F6';
+            context.setLineDash([6, 3]);
+            context.lineWidth = 1 * dpr;
+            context.strokeRect(selectionBox.minX, selectionBox.minY, selectionBox.maxX - selectionBox.minX, selectionBox.maxY - selectionBox.minY);
+            context.setLineDash([]);
+            
+            // Draw resize handles
+            const handles = getResizeHandles(selectionBox);
+            context.fillStyle = '#3B82F6';
+            Object.values(handles).forEach(h => context.fillRect(h.minX, h.minY, h.maxX - h.minX, h.maxY - h.minY));
+        }
+    }
     
     // Draw selection box (marquee)
     if (selectionBox) {
@@ -183,7 +231,10 @@ export default function DrawingCanvas() {
     for (let i = historyIndex; i >= 0; i--) {
         const action = history[i];
         const box = getActionBoundingBox(action);
-        if (isPointInsideBox(point, box)) {
+        // Add a small buffer for easier selection of thin lines
+        const buffer = action.lineWidth / 2;
+        const bufferedBox = { minX: box.minX - buffer, minY: box.minY - buffer, maxX: box.maxX + buffer, maxY: box.maxY + buffer };
+        if (isPointInsideBox(point, bufferedBox)) {
             return action;
         }
     }
@@ -202,16 +253,28 @@ export default function DrawingCanvas() {
     }
 
     if (tool === 'select') {
+        const selectedActions = history.filter(a => selectedActionIds.has(a.id));
+        const selectionBox = getCombinedBoundingBox(selectedActions);
+        if (selectionBox) {
+            const handle = getHandleAtPoint(currentPoint, selectionBox);
+            if (handle) {
+                setInteractionMode('resizing');
+                setResizingHandle(handle);
+                return;
+            }
+        }
+        
         const actionAtPoint = getActionAtPoint(currentPoint);
         if (actionAtPoint) {
             setInteractionMode('moving');
             if (!selectedActionIds.has(actionAtPoint.id)) {
-                const newSelection = new Set([actionAtPoint.id]);
+                const newSelection = event.shiftKey ? new Set(selectedActionIds) : new Set();
+                newSelection.add(actionAtPoint.id);
                 setSelectedActionIds(newSelection);
             }
         } else {
             setInteractionMode('selecting');
-            setSelectedActionIds(new Set());
+            if(!event.shiftKey) setSelectedActionIds(new Set());
             setSelectionBox({ start: currentPoint, end: currentPoint });
         }
         return;
@@ -234,16 +297,64 @@ export default function DrawingCanvas() {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!startPoint) return;
     const currentPoint = getCanvasCoordinates(event);
+    
+    if (tool === 'select' && interactionMode === 'none') {
+        const selectedActions = history.filter(a => selectedActionIds.has(a.id));
+        const selectionBox = getCombinedBoundingBox(selectedActions);
+        if (selectionBox) {
+            const handle = getHandleAtPoint(currentPoint, selectionBox);
+            setHoveredHandle(handle);
+        } else {
+            setHoveredHandle(null);
+        }
+    }
+
+
+    if (!startPoint) return;
+    
 
     if (interactionMode === 'panning') {
-        const dx = (event.clientX * (window.devicePixelRatio || 1)) - (startPoint.x + viewOffset.x);
-        const dy = (event.clientY * (window.devicePixelRatio || 1)) - (startPoint.y + viewOffset.y);
-        const panDx = currentPoint.x - startPoint.x;
-        const panDy = currentPoint.y - startPoint.y;
+        const dx = currentPoint.x - startPoint.x;
+        const dy = currentPoint.y - startPoint.y;
+        setViewOffset(prev => ({x: prev.x + dx, y: prev.y + dy}));
+        return;
+    }
 
-        setViewOffset(prev => ({x: prev.x + panDx, y: prev.y + panDy}));
+    if (interactionMode === 'resizing') {
+        const selectedActions = history.filter(action => selectedActionIds.has(action.id));
+        const originalBox = getCombinedBoundingBox(selectedActions);
+        if (!originalBox || !resizingHandle) return;
+
+        let { minX, minY, maxX, maxY } = originalBox;
+
+        // Determine new bounds
+        if (resizingHandle.includes('left')) minX = currentPoint.x;
+        if (resizingHandle.includes('right')) maxX = currentPoint.x;
+        if (resizingHandle.includes('top')) minY = currentPoint.y;
+        if (resizingHandle.includes('bottom')) maxY = currentPoint.y;
+
+        const newWidth = maxX - minX;
+        const newHeight = maxY - minY;
+        const originalWidth = originalBox.maxX - originalBox.minX;
+        const originalHeight = originalBox.maxY - originalBox.minY;
+
+        // Avoid division by zero
+        if (originalWidth === 0 || originalHeight === 0) return;
+
+        const scaleX = newWidth / originalWidth;
+        const scaleY = newHeight / originalHeight;
+
+        setHistory(prev => prev.map(action => {
+            if (selectedActionIds.has(action.id)) {
+                const newPoints = action.points.map(p => ({
+                    x: minX + (p.x - originalBox.minX) * scaleX,
+                    y: minY + (p.y - originalBox.minY) * scaleY,
+                }));
+                return { ...action, points: newPoints };
+            }
+            return action;
+        }));
         return;
     }
 
@@ -295,7 +406,7 @@ export default function DrawingCanvas() {
             maxY: Math.max(selectionBox.start.y, selectionBox.end.y),
         };
         
-        const idsToSelect = new Set<number>();
+        const idsToSelect = event.shiftKey ? new Set(selectedActionIds) : new Set<number>();
         history.slice(0, historyIndex + 1).forEach(action => {
             const actionBox = getActionBoundingBox(action);
             // Check for intersection
@@ -307,13 +418,10 @@ export default function DrawingCanvas() {
         setSelectedActionIds(idsToSelect);
     }
     
-    if (interactionMode === 'drawing') {
-      // The history has already been updated in pointer move
-    }
-
     setInteractionMode('none');
     setStartPoint(null);
     setSelectionBox(null);
+    setResizingHandle(null);
   };
   
   const undo = () => {
@@ -338,6 +446,12 @@ export default function DrawingCanvas() {
   };
   
   const getCursor = () => {
+    if (hoveredHandle) {
+        if (hoveredHandle === 'topLeft' || hoveredHandle === 'bottomRight') return 'nwse-resize';
+        if (hoveredHandle === 'topRight' || hoveredHandle === 'bottomLeft') return 'nesw-resize';
+        if (hoveredHandle === 'top' || hoveredHandle === 'bottom') return 'ns-resize';
+        if (hoveredHandle === 'left' || hoveredHandle === 'right') return 'ew-resize';
+    }
     if (tool === 'hand') {
       return interactionMode === 'panning' ? 'grabbing' : 'grab';
     }
