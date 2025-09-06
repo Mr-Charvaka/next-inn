@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
 import PollPanel from "@/components/poll-panel";
@@ -11,7 +11,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, MoreHorizontal, Users } from "lucide-react";
+import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 type ViewMode = "video" | "draw" | "share";
 
@@ -98,7 +98,7 @@ const participantNames = [
     "Maitreyee Mehta", "Rajan Mehta", "Yogini Rajput", "Subho Rajput", "Vaishali Goyal", "Kapil Goyal", "Krisha Malhotra", "Manu Malhotra", "Leher Gupta", "Asgar Gupta", "Simona Menon", "Pritam Menon", "Sandhya Joshi", 
     "Arindam Joshi", "Shraddha Agarwal", "Dilip Agarwal", "Ishana Bansal", "Shakti Bansal", "Chandrika Rathore", "Ravish Rathore", "Smruti Verma", "Subhaan Verma", "Natasha Pillai", "Zaheer Pillai", "Monisha Kulkarni", 
     "Naveen Kulkarni", "Darshita Jadhav", "Shiva Jadhav", "Suman Shetty", "Surya Shetty", "Riya Pawar", "Sanjit Pawar", "Saloni Krishna", "Manas Krishna"
-];
+].sort(() => Math.random() - 0.5);
 
 
 const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
@@ -113,7 +113,8 @@ const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
 });
 
 export default function Home() {
-  const [isPollPanelOpen, setIsPollPanelOpen] = useState(true);
+  const router = useRouter();
+  const [isPollPanelOpen, setIsPollPanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("video");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>(allParticipants);
@@ -195,7 +196,7 @@ export default function Home() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `SimuMeet-Recording-${new Date().toISOString()}.webm`;
+        a.download = `NextInn-Recording-${new Date().toISOString()}.webm`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -236,7 +237,12 @@ export default function Home() {
       stopRecording();
     }
     setShowExitDialog(true);
-  }
+  };
+  
+  const leaveMeeting = () => {
+    setShowExitDialog(false);
+    router.push('/goodbye');
+  };
 
   const toggleMic = (id: number) => {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, isMicOn: !p.isMicOn } : p));
@@ -290,7 +296,7 @@ export default function Home() {
       case 'video':
       default:
         return (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 p-4 h-full overflow-auto">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4 p-4 h-full overflow-auto">
             {participants.slice(0, 11).map((p) => (
               <ParticipantCard key={p.id} participant={p} />
             ))}
@@ -348,49 +354,9 @@ export default function Home() {
           onEndCall={handleEndCall}
         />
         <div className="flex flex-1 overflow-hidden">
-          <nav className="flex flex-col items-center gap-2 py-4 px-2 bg-card border-r">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('video')}>
-                    <Video className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right"><p>Video Grid</p></TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('draw')}>
-                    <Edit3 className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right"><p>Whiteboard</p></TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={viewMode === 'share' ? 'secondary' : 'ghost'} size="icon" onClick={handleScreenShareToggle}>
-                    <ScreenShare className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right"><p>Screen Share</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <div className="mt-auto flex flex-col gap-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant={isPollPanelOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setIsPollPanelOpen(!isPollPanelOpen)}>
-                      <Vote className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right"><p>Toggle Polls</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </nav>
           <main className="flex-1 flex flex-col">
             <ResizablePanelGroup direction="horizontal" className="flex-1">
-              <ResizablePanel defaultSize={75} minSize={30}>
+              <ResizablePanel defaultSize={isPollPanelOpen ? 75 : 100} minSize={30}>
                 <div className="flex-1 h-full bg-secondary/30">
                   {renderView()}
                 </div>
@@ -406,7 +372,46 @@ export default function Home() {
             </ResizablePanelGroup>
           </main>
         </div>
+
+        <footer className="flex items-center justify-center gap-2 py-2 px-4 bg-card border-t">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('video')}>
+                    <Video className="h-6 w-6" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Video Grid</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('draw')}>
+                    <Edit3 className="h-6 w-6" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Whiteboard</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={viewMode === 'share' ? 'secondary' : 'ghost'} size="lg" onClick={handleScreenShareToggle}>
+                    <ScreenShare className="h-6 w-6" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Screen Share</p></TooltipContent>
+              </Tooltip>
+              <div className="w-px h-8 bg-border mx-4" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={isPollPanelOpen ? 'secondary' : 'ghost'} size="lg" onClick={() => setIsPollPanelOpen(!isPollPanelOpen)}>
+                    <Vote className="h-6 w-6" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Toggle Polls</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+        </footer>
       </div>
+
       <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -417,7 +422,7 @@ export default function Home() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Stay</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { /* In a real app, you would handle cleanup here */ setShowExitDialog(false); }}>Leave</AlertDialogAction>
+            <AlertDialogAction onClick={leaveMeeting}>Leave</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
