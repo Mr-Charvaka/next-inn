@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
-import ChatPanel from "@/components/chat-panel";
+import PollPanel from "@/components/poll-panel";
 import ScreenShareView from "@/components/screen-share-view";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -11,7 +11,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, MessageCircle, ScreenShare, Mic, MicOff, VideoOff, MoreHorizontal } from "lucide-react";
+import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -64,7 +64,7 @@ const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
 });
 
 export default function Home() {
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isPollPanelOpen, setIsPollPanelOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("video");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>(allParticipants);
@@ -329,11 +329,11 @@ export default function Home() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant={isChatOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setIsChatOpen(!isChatOpen)}>
-                      <MessageCircle className="h-5 w-5" />
+                    <Button variant={isPollPanelOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setIsPollPanelOpen(!isPollPanelOpen)}>
+                      <Vote className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="right"><p>Toggle Chat</p></TooltipContent>
+                  <TooltipContent side="right"><p>Toggle Polls</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -345,11 +345,11 @@ export default function Home() {
                   {renderView()}
                 </div>
               </ResizablePanel>
-              {isChatOpen && (
+              {isPollPanelOpen && (
                 <>
                   <ResizableHandle withHandle />
                   <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                    <ChatPanel />
+                    <PollPanel />
                   </ResizablePanel>
                 </>
               )}
