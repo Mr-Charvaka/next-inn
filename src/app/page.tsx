@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
 import ChatPanel from "@/components/chat-panel";
@@ -11,7 +11,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, MessageCircle, ScreenShare, User, Mic, MicOff, VideoOff, MoreHorizontal } from "lucide-react";
+import { Video, Edit3, MessageCircle, ScreenShare, Mic, MicOff, VideoOff, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -25,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type ViewMode = "video" | "draw" | "share";
 
@@ -68,6 +69,12 @@ export default function Home() {
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>(allParticipants);
   const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  
   const { toast } = useToast();
 
   const handleScreenShareToggle = async () => {
@@ -98,6 +105,89 @@ export default function Home() {
       }
     }
   };
+
+  const handleRecordingToggle = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      // For simplicity, we'll record the screen share stream if available, otherwise just audio.
+      // A more complex implementation could combine multiple streams.
+      const streamToRecord = screenStream || (await navigator.mediaDevices.getUserMedia({ audio: true }));
+      
+      if (!streamToRecord) {
+        toast({
+          variant: "destructive",
+          title: "Recording Failed",
+          description: "No media stream to record. Please start screen sharing or allow microphone access.",
+        });
+        return;
+      }
+
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current = new MediaRecorder(streamToRecord, {
+        mimeType: 'video/webm; codecs=vp9'
+      });
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, {
+          type: 'video/webm'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SimuMeet-Recording-${new Date().toISOString()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast({
+          title: "Recording Saved",
+          description: "Your recording has been downloaded.",
+        });
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      toast({
+        title: "Recording Started",
+        description: "The meeting is now being recorded.",
+      });
+
+    } catch (error) {
+      console.error("Recording error:", error);
+      toast({
+        variant: "destructive",
+        title: "Recording Failed",
+        description: "Could not start recording. Please check permissions.",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const handleEndCall = () => {
+    if (isRecording) {
+      stopRecording();
+    }
+    setShowExitDialog(true);
+  }
 
   const toggleMic = (id: number) => {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, isMicOn: !p.isMicOn } : p));
@@ -200,67 +290,87 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background text-foreground">
-      <AppHeader />
-      <div className="flex flex-1 overflow-hidden">
-        <nav className="flex flex-col items-center gap-4 py-4 px-2 bg-card border-r">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('video')}>
-                  <Video className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Video Grid</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('draw')}>
-                  <Edit3 className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Whiteboard</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={viewMode === 'share' ? 'secondary' : 'ghost'} size="icon" onClick={handleScreenShareToggle}>
-                  <ScreenShare className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Screen Share</p></TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <div className="mt-auto">
+    <>
+      <div className="flex h-screen w-full flex-col bg-background text-foreground">
+        <AppHeader 
+          isRecording={isRecording} 
+          onRecordingToggle={handleRecordingToggle}
+          onEndCall={handleEndCall}
+        />
+        <div className="flex flex-1 overflow-hidden">
+          <nav className="flex flex-col items-center gap-4 py-4 px-2 bg-card border-r">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={isChatOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setIsChatOpen(!isChatOpen)}>
-                    <MessageCircle className="h-5 w-5" />
+                  <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('video')}>
+                    <Video className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="right"><p>Toggle Chat</p></TooltipContent>
+                <TooltipContent side="right"><p>Video Grid</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('draw')}>
+                    <Edit3 className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right"><p>Whiteboard</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={viewMode === 'share' ? 'secondary' : 'ghost'} size="icon" onClick={handleScreenShareToggle}>
+                    <ScreenShare className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right"><p>Screen Share</p></TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </div>
-        </nav>
-        <main className="flex-1 flex flex-col">
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
-            <ResizablePanel defaultSize={75}>
-              <div className="flex-1 h-full">
-                {renderView()}
-              </div>
-            </ResizablePanel>
-            {isChatOpen && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                  <ChatPanel />
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-        </main>
+            <div className="mt-auto">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant={isChatOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setIsChatOpen(!isChatOpen)}>
+                      <MessageCircle className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right"><p>Toggle Chat</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </nav>
+          <main className="flex-1 flex flex-col">
+            <ResizablePanelGroup direction="horizontal" className="flex-1">
+              <ResizablePanel defaultSize={75}>
+                <div className="flex-1 h-full">
+                  {renderView()}
+                </div>
+              </ResizablePanel>
+              {isChatOpen && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                    <ChatPanel />
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          </main>
+        </div>
       </div>
-    </div>
+      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Meeting?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave the meeting? If you are recording, it will be stopped and saved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { /* In a real app, you would handle cleanup here */ setShowExitDialog(false); }}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
