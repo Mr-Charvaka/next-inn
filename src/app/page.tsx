@@ -146,14 +146,23 @@ export default function Home() {
     // Then add other participants over time
     const interval = setInterval(() => {
       setParticipants(prev => {
-        if (prev.length < allParticipants.length + 1) {
-          const nextParticipant = allParticipants[prev.length -1];
-          return [...prev, nextParticipant];
+        const currentCount = prev.length - 1; // -1 for the teacher
+        if (currentCount >= allParticipants.length) {
+          clearInterval(interval);
+          return prev;
         }
-        clearInterval(interval);
-        return prev;
+
+        const newParticipantCount = Math.floor(Math.random() * 10) + 1;
+        const nextParticipants = allParticipants.slice(currentCount, currentCount + newParticipantCount);
+        
+        if (nextParticipants.length > 0) {
+            return [...prev, ...nextParticipants];
+        } else {
+            clearInterval(interval);
+            return prev;
+        }
       });
-    }, Math.random() * (5000 - 1000) + 1000); // Add a participant every 1-5 seconds
+    }, Math.random() * (5000 - 1000) + 1000); // Add participants every 1-5 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -451,5 +460,3 @@ export default function Home() {
     </>
   );
 }
-
-    
