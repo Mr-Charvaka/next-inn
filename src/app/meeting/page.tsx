@@ -159,23 +159,22 @@ export default function MeetingPage() {
           setParticipants(prev => {
             const currentCount = prev.length - 1;
 
-            if (currentCount >= 950) {
-              // Fluctuation logic
+            // Fluctuation logic when participant count is high
+            if (currentCount >= 912) {
               const shouldAdd = Math.random() > 0.5;
               if (shouldAdd && currentCount < 1000) {
-                const newParticipantCount = Math.floor(Math.random() * 5) + 1;
+                const newParticipantCount = Math.floor(Math.random() * 2) + 1; // Add 1 or 2
                 const cappedCount = Math.min(newParticipantCount, 1000 - currentCount);
                 const nextParticipants = allParticipants.slice(currentCount, currentCount + cappedCount);
                 return [...prev, ...nextParticipants];
               } else if (!shouldAdd && currentCount > 912) {
-                const participantsToRemove = Math.floor(Math.random() * 5) + 1;
-                const cappedCount = Math.max(0, prev.length - participantsToRemove);
-                if (cappedCount <= 912) return prev; // Ensure it doesn't go below 912
-                return prev.slice(0, cappedCount);
+                const participantsToRemove = Math.floor(Math.random() * 2) + 1; // Remove 1 or 2
+                return prev.slice(0, prev.length - participantsToRemove);
               }
               return prev; // No change if conditions aren't met
             }
 
+            // Normal joining logic
             if (currentCount >= allParticipants.length) {
               clearInterval(interval);
               return prev;
