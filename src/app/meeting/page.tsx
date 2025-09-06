@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
 import PollPanel from "@/components/poll-panel";
@@ -128,11 +128,12 @@ export default function MeetingPage() {
   const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
-  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   
   const { toast } = useToast();
 
@@ -178,28 +179,49 @@ export default function MeetingPage() {
     return () => clearTimeout(joinDelay);
   }, []);
 
-  useEffect(() => {
-    const getCameraPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({video: true});
+  const getCameraPermission = useCallback(async () => {
+    if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        streamRef.current = stream;
         setHasCameraPermission(true);
 
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+            videoRef.current.srcObject = stream;
         }
-      } catch (error) {
+    } catch (error) {
         console.error('Error accessing camera:', error);
         setHasCameraPermission(false);
         toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings to use this app.',
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to use this app.',
         });
-      }
-    };
-
-    getCameraPermission();
+    }
   }, [toast]);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+    }
+    if(videoRef.current) {
+        videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => {
+      const host = participants.find(p => p.id === 0);
+      if (host?.isVideoOn) {
+          getCameraPermission();
+      } else {
+          stopCamera();
+      }
+  }, [participants, getCameraPermission, stopCamera]);
+
 
   const handleScreenShareToggle = async () => {
     if (viewMode === 'share') {
@@ -330,27 +352,41 @@ export default function MeetingPage() {
     window.open('/polls', '_blank', 'width=500,height=700,resizable=yes,scrollbars=yes');
   }
   
-  const ParticipantCard = ({ participant }: { participant: Participant }) => (
+  const ParticipantCard = ({ participant }: { participant: Participant }) => {
+    const host = participants.find(p => p.id === 0);
+
+    return (
     <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group border border-transparent hover:border-primary transition-colors">
       {participant.id === 0 ? (
-        <>
-            <video ref={videoRef} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" autoPlay muted playsInline />
-            {!hasCameraPermission && (
-                 <div className="w-full h-full bg-secondary flex flex-col items-center justify-center gap-2 p-4 text-center">
-                    <Avatar className="w-24 h-24 text-3xl">
-                        <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
-                            {participant.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                    </Avatar>
-                     <Alert variant="destructive" className="mt-4">
-                        <AlertTitle>Camera Access Required</AlertTitle>
-                        <AlertDescription>
-                            Please allow camera access to use this feature.
-                        </AlertDescription>
-                    </Alert>
-                </div>
-            )}
-        </>
+         <>
+         {host?.isVideoOn ? (
+           <video ref={videoRef} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" autoPlay muted playsInline />
+         ) : (
+           <Image 
+             src="https://i.ibb.co/ynr7K0cz/host.jpg"
+             alt="Host camera off"
+             width={400}
+             height={300}
+             data-ai-hint="person portrait"
+             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+           />
+         )}
+         {hasCameraPermission === false && host?.isVideoOn && (
+           <div className="absolute inset-0 bg-secondary flex flex-col items-center justify-center gap-2 p-4 text-center">
+             <Avatar className="w-24 h-24 text-3xl">
+               <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
+                 {participant.name.split(' ').map(n => n[0]).join('')}
+               </AvatarFallback>
+             </Avatar>
+             <Alert variant="destructive" className="mt-4">
+               <AlertTitle>Camera Access Required</AlertTitle>
+               <AlertDescription>
+                 Please allow camera access to use this feature.
+               </AlertDescription>
+             </Alert>
+           </div>
+         )}
+       </>
       ) : participant.isVideoOn ? (
         <Image 
           src={`https://picsum.photos/seed/${participant.image}/400/300`} 
@@ -384,7 +420,7 @@ export default function MeetingPage() {
         <span className="font-medium">{participant.name}</span>
       </div>
     </div>
-  );
+  )};
 
   const renderView = () => {
     switch(viewMode) {
@@ -531,3 +567,5 @@ export default function MeetingPage() {
     </>
   );
 }
+
+    
