@@ -182,6 +182,10 @@ export default function DrawingCanvas() {
 
     const activeHistory = history.slice(0, historyIndex + 1);
     activeHistory.forEach(action => drawAction(context, action));
+
+    if (currentDrawingActionRef.current) {
+        drawAction(context, currentDrawingActionRef.current);
+    }
     
     // Draw selection highlights
     const selectedActions = activeHistory.filter(a => selectedActionIds.has(a.id));
@@ -208,11 +212,6 @@ export default function DrawingCanvas() {
         context.strokeStyle = 'rgba(123, 71, 222, 0.8)';
         context.fillStyle = 'rgba(123, 71, 222, 0.2)';
         context.lineWidth = 1 * dpr;
-        const worldStart = screenToWorld(selectionBox.start);
-        const worldEnd = screenToWorld(selectionBox.end);
-
-        const width = worldEnd.x - worldStart.x;
-        const height = worldEnd.y - worldStart.y;
         context.fillRect(selectionBox.start.x, selectionBox.start.y, selectionBox.end.x - selectionBox.start.x, selectionBox.end.y - selectionBox.start.y);
         context.strokeRect(selectionBox.start.x, selectionBox.start.y, selectionBox.end.x - selectionBox.start.x, selectionBox.end.y - selectionBox.start.y);
         context.restore();
@@ -318,7 +317,7 @@ export default function DrawingCanvas() {
     }
     
     const isDrawingTool = ['pen', 'eraser', 'rect', 'circle'].includes(tool);
-    if (isDrawingTool && event.pointerType === 'touch' && pointers.length === 1) {
+    if (isDrawingTool && event.pointerType === 'touch') {
       return;
     }
     
@@ -463,22 +462,13 @@ export default function DrawingCanvas() {
     if (interactionMode === 'drawing') {
       const currentAction = currentDrawingActionRef.current;
       if (!currentAction) return;
-
-      const context = getCanvasContext();
-      if (!context) return;
       
       const coalescedEvents = event.getCoalescedEvents();
-      const newPoints = coalescedEvents.map(e => screenToWorld(getCanvasCoordinates(e)));
+      const newPoints = coalescedEvents.map(e => screenToWorld(getCanvasCoordinates(e as React.PointerEvent<HTMLCanvasElement>)));
 
       currentAction.points.push(...newPoints);
 
       redrawCanvas();
-      
-      context.save();
-      context.translate(viewOffset.x, viewOffset.y);
-      context.scale(scale, scale);
-      drawAction(context, currentAction);
-      context.restore();
     }
   };
 
@@ -487,11 +477,10 @@ export default function DrawingCanvas() {
     pointersRef.current.delete(event.pointerId);
 
     if (currentDrawingActionRef.current) {
-        if(currentDrawingActionRef.current.points.length > 0) {
-            const newHistory = history.slice(0, historyIndex + 1);
-            setHistory([...newHistory, currentDrawingActionRef.current]);
-            setHistoryIndex(newHistory.length);
-        }
+        const newHistory = history.slice(0, historyIndex + 1);
+        newHistory.push(currentDrawingActionRef.current);
+        setHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
         currentDrawingActionRef.current = null;
     }
 
