@@ -18,7 +18,7 @@ type DrawingAction = {
 };
 
 type HandlePosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'top' | 'right' | 'bottom' | 'left';
-type InteractionMode = 'none' | 'drawing' | 'panning' | 'selecting' | 'moving' | 'resizing';
+type InteractionMode = 'none' | 'drawing' | 'panning' | 'selecting' | 'moving' | 'resizing' | 'gesturing';
 type BoundingBox = { minX: number; minY: number; maxX: number; maxY: number };
 
 const getActionBoundingBox = (action: DrawingAction): BoundingBox => {
@@ -48,6 +48,8 @@ const getCombinedBoundingBox = (actions: DrawingAction[]): BoundingBox | null =>
 };
 
 const HANDLE_SIZE = 8;
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 10;
 
 export default function DrawingCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,6 +61,7 @@ export default function DrawingCanvas() {
   const [history, setHistory] = useState<DrawingAction[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
+  const [scale, setScale] = useState(1);
   const [viewOffset, setViewOffset] = useState<Point>({ x: 0, y: 0 });
   const startPointRef = useRef<Point | null>(null);
 
@@ -66,6 +69,10 @@ export default function DrawingCanvas() {
   const [selectionBox, setSelectionBox] = useState<{start: Point, end: Point} | null>(null);
   const [resizingHandle, setResizingHandle] = useState<HandlePosition | null>(null);
   const [hoveredHandle, setHoveredHandle] = useState<HandlePosition | null>(null);
+  
+  const pointersRef = useRef<Map<number, Point>>(new Map());
+  const lastGestureDistRef = useRef<number | null>(null);
+  const lastGestureMidpointRef = useRef<Point | null>(null);
 
   const colors = ['#FFFFFF', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6', '#A855F7'];
 
@@ -80,10 +87,18 @@ export default function DrawingCanvas() {
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    const canvasX = (event.clientX - rect.left) * dpr;
-    const canvasY = (event.clientY - rect.top) * dpr;
-    return { x: canvasX - viewOffset.x, y: canvasY - viewOffset.y };
+    return { 
+        x: (event.clientX - rect.left) * dpr, 
+        y: (event.clientY - rect.top) * dpr 
+    };
   }
+  
+  const screenToWorld = (point: Point): Point => {
+    return {
+      x: (point.x - viewOffset.x) / scale,
+      y: (point.y - viewOffset.y) / scale,
+    };
+  };
 
   const drawAction = (context: CanvasRenderingContext2D, action: DrawingAction) => {
     context.beginPath();
@@ -126,8 +141,7 @@ export default function DrawingCanvas() {
   };
 
   const getResizeHandles = (box: BoundingBox): Record<HandlePosition, BoundingBox> => {
-    const dpr = window.devicePixelRatio || 1;
-    const size = HANDLE_SIZE / dpr * 2;
+    const size = HANDLE_SIZE / scale;
     return {
       topLeft: { minX: box.minX - size / 2, minY: box.minY - size / 2, maxX: box.minX + size / 2, maxY: box.minY + size / 2 },
       topRight: { minX: box.maxX - size / 2, minY: box.minY - size / 2, maxX: box.maxX + size / 2, maxY: box.minY + size / 2 },
@@ -162,6 +176,7 @@ export default function DrawingCanvas() {
 
     context.save();
     context.translate(viewOffset.x, viewOffset.y);
+    context.scale(scale, scale);
 
     const activeHistory = history.slice(0, historyIndex + 1);
     activeHistory.forEach(action => drawAction(context, action));
@@ -172,8 +187,8 @@ export default function DrawingCanvas() {
         const selectionBox = getCombinedBoundingBox(selectedActions);
         if (selectionBox) {
             context.strokeStyle = 'hsl(262.1 83.3% 57.8%)';
-            context.setLineDash([6, 3]);
-            context.lineWidth = 1 * dpr;
+            context.setLineDash([6 / scale, 3 / scale]);
+            context.lineWidth = 1 / scale * dpr;
             context.strokeRect(selectionBox.minX, selectionBox.minY, selectionBox.maxX - selectionBox.minX, selectionBox.maxY - selectionBox.minY);
             context.setLineDash([]);
             
@@ -183,25 +198,29 @@ export default function DrawingCanvas() {
             Object.values(handles).forEach(h => context.fillRect(h.minX, h.minY, h.maxX - h.minX, h.maxY - h.minY));
         }
     }
+    context.restore();
     
-    // Draw selection box (marquee)
+    // Draw selection box (marquee) - this should not be scaled
     if (selectionBox) {
+        context.save();
         context.strokeStyle = 'rgba(123, 71, 222, 0.8)';
         context.fillStyle = 'rgba(123, 71, 222, 0.2)';
         context.lineWidth = 1 * dpr;
-        const width = selectionBox.end.x - selectionBox.start.x;
-        const height = selectionBox.end.y - selectionBox.start.y;
-        context.fillRect(selectionBox.start.x, selectionBox.start.y, width, height);
-        context.strokeRect(selectionBox.start.x, selectionBox.start.y, width, height);
+        const worldStart = screenToWorld(selectionBox.start);
+        const worldEnd = screenToWorld(selectionBox.end);
+
+        const width = worldEnd.x - worldStart.x;
+        const height = worldEnd.y - worldStart.y;
+        context.fillRect(selectionBox.start.x, selectionBox.start.y, selectionBox.end.x - selectionBox.start.x, selectionBox.end.y - selectionBox.start.y);
+        context.strokeRect(selectionBox.start.x, selectionBox.start.y, selectionBox.end.x - selectionBox.start.x, selectionBox.end.y - selectionBox.start.y);
+        context.restore();
     }
 
-    context.restore();
-
-  }, [getCanvasContext, history, historyIndex, viewOffset, selectedActionIds, selectionBox]);
+  }, [getCanvasContext, history, historyIndex, viewOffset, scale, selectedActionIds, selectionBox]);
 
   useEffect(() => {
     redrawCanvas();
-  }, [history, historyIndex, viewOffset, redrawCanvas, selectedActionIds, selectionBox]);
+  }, [history, historyIndex, viewOffset, scale, redrawCanvas, selectedActionIds, selectionBox]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -233,7 +252,7 @@ export default function DrawingCanvas() {
         const action = history[i];
         const box = getActionBoundingBox(action);
         // Add a small buffer for easier selection of thin lines
-        const buffer = action.lineWidth / 2 + 5;
+        const buffer = action.lineWidth / 2 + (5 / scale);
         const bufferedBox = { minX: box.minX - buffer, minY: box.minY - buffer, maxX: box.maxX + buffer, maxY: box.maxY + buffer };
         if (isPointInsideBox(point, bufferedBox)) {
             return action;
@@ -243,13 +262,19 @@ export default function DrawingCanvas() {
   }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const isTouch = event.pointerType === 'touch' && event.height < 1.1 && event.width < 1.1;
-    if (isTouch && tool !== 'hand') return;
     if (event.button !== 0) return; // Only main click
     event.currentTarget.setPointerCapture(event.pointerId);
 
-    const currentPoint = getCanvasCoordinates(event);
+    const currentScreenPoint = getCanvasCoordinates(event);
+    pointersRef.current.set(event.pointerId, currentScreenPoint);
+    
+    const currentPoint = screenToWorld(currentScreenPoint);
     startPointRef.current = currentPoint;
+    
+    if (pointersRef.current.size > 1) {
+        setInteractionMode('gesturing');
+        return;
+    }
 
     if (tool === 'hand') {
         setInteractionMode('panning');
@@ -279,7 +304,7 @@ export default function DrawingCanvas() {
         } else {
             setInteractionMode('selecting');
             if(!event.shiftKey) setSelectedActionIds(new Set());
-            setSelectionBox({ start: currentPoint, end: currentPoint });
+            setSelectionBox({ start: currentScreenPoint, end: currentScreenPoint });
         }
         return;
     }
@@ -302,7 +327,13 @@ export default function DrawingCanvas() {
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const currentPoint = getCanvasCoordinates(event);
+    const currentScreenPoint = getCanvasCoordinates(event);
+
+    if (pointersRef.current.has(event.pointerId)) {
+        pointersRef.current.set(event.pointerId, currentScreenPoint);
+    }
+    
+    const currentPoint = screenToWorld(currentScreenPoint);
     const startPoint = startPointRef.current;
     
     if (tool === 'select' && interactionMode === 'none') {
@@ -316,11 +347,48 @@ export default function DrawingCanvas() {
         }
     }
 
+    if (interactionMode === 'gesturing') {
+        if (pointersRef.current.size < 2) return;
+        const pointers = Array.from(pointersRef.current.values());
+        const p1 = pointers[0];
+        const p2 = pointers[1];
+        
+        const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        const midpoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+        if (lastGestureDistRef.current) {
+            const scaleDelta = dist / lastGestureDistRef.current;
+            const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * scaleDelta));
+            
+            const worldMidpoint = screenToWorld(midpoint);
+            const newOffsetX = midpoint.x - worldMidpoint.x * newScale;
+            const newOffsetY = midpoint.y - worldMidpoint.y * newScale;
+
+            setScale(newScale);
+            setViewOffset({ x: newOffsetX, y: newOffsetY });
+        }
+        
+        if (lastGestureMidpointRef.current) {
+            const dx = midpoint.x - lastGestureMidpointRef.current.x;
+            const dy = midpoint.y - lastGestureMidpointRef.current.y;
+            setViewOffset(prev => ({x: prev.x + dx, y: prev.y + dy}));
+        }
+
+        lastGestureDistRef.current = dist;
+        lastGestureMidpointRef.current = midpoint;
+        return;
+    }
+
+
     if (!startPoint) return;
     
     if (interactionMode === 'panning') {
-        const dx = currentPoint.x - startPoint.x;
-        const dy = currentPoint.y - startPoint.y;
+        const startScreenPoint = {
+            x: startPoint.x * scale + viewOffset.x,
+            y: startPoint.y * scale + viewOffset.y
+        };
+        const dx = currentScreenPoint.x - startScreenPoint.x;
+        const dy = currentScreenPoint.y - startScreenPoint.y;
         setViewOffset(prev => ({x: prev.x + dx, y: prev.y + dy}));
         return;
     }
@@ -379,7 +447,11 @@ export default function DrawingCanvas() {
     }
 
     if (interactionMode === 'selecting') {
-        setSelectionBox({ start: startPoint, end: currentPoint });
+        const screenStartPoint = {
+            x: startPoint.x * scale + viewOffset.x,
+            y: startPoint.y * scale + viewOffset.y
+        }
+        setSelectionBox({ start: screenStartPoint, end: currentScreenPoint });
         return;
     }
     
@@ -405,20 +477,30 @@ export default function DrawingCanvas() {
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.releasePointerCapture(event.pointerId);
+    pointersRef.current.delete(event.pointerId);
+
+    if (interactionMode === 'gesturing') {
+        if (pointersRef.current.size < 2) {
+            setInteractionMode('none');
+            lastGestureDistRef.current = null;
+            lastGestureMidpointRef.current = null;
+        }
+        return;
+    }
 
     if (interactionMode === 'selecting' && selectionBox) {
-        const selectionRect = {
-            minX: Math.min(selectionBox.start.x, selectionBox.end.x),
-            minY: Math.min(selectionBox.start.y, selectionBox.end.y),
-            maxX: Math.max(selectionBox.start.x, selectionBox.end.x),
-            maxY: Math.max(selectionBox.start.y, selectionBox.end.y),
+        const worldSelectionBox = {
+            minX: Math.min(screenToWorld(selectionBox.start).x, screenToWorld(selectionBox.end).x),
+            minY: Math.min(screenToWorld(selectionBox.start).y, screenToWorld(selectionBox.end).y),
+            maxX: Math.max(screenToWorld(selectionBox.start).x, screenToWorld(selectionBox.end).x),
+            maxY: Math.max(screenToWorld(selectionBox.start).y, screenToWorld(selectionBox.end).y),
         };
         
         const idsToSelect = event.shiftKey ? new Set(selectedActionIds) : new Set<number>();
         history.slice(0, historyIndex + 1).forEach(action => {
             const actionBox = getActionBoundingBox(action);
-            if (actionBox.minX < selectionRect.maxX && actionBox.maxX > selectionRect.minX &&
-                actionBox.minY < selectionRect.maxY && actionBox.maxY > selectionRect.minY) {
+            if (actionBox.minX < worldSelectionBox.maxX && actionBox.maxX > worldSelectionBox.minX &&
+                actionBox.minY < worldSelectionBox.maxY && actionBox.maxY > worldSelectionBox.minY) {
                 idsToSelect.add(action.id);
             }
         });
@@ -449,6 +531,7 @@ export default function DrawingCanvas() {
     setHistory([]);
     setHistoryIndex(-1);
     setViewOffset({ x: 0, y: 0 });
+    setScale(1);
     setSelectedActionIds(new Set());
   };
   
@@ -459,7 +542,7 @@ export default function DrawingCanvas() {
         if (hoveredHandle === 'top' || hoveredHandle === 'bottom') return 'ns-resize';
         if (hoveredHandle === 'left' || hoveredHandle === 'right') return 'ew-resize';
     }
-    if (tool === 'hand') {
+    if (tool === 'hand' || interactionMode === 'panning') {
       return interactionMode === 'panning' ? 'grabbing' : 'grab';
     }
     if (tool === 'select') {
@@ -510,6 +593,11 @@ export default function DrawingCanvas() {
           </PopoverContent>
         </Popover>
       </div>
+       <div className="absolute bottom-4 right-4 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-2">
+        <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.min(MAX_SCALE, s + 0.1))}>+</Button>
+        <Button variant="ghost" size="icon" onClick={() => setScale(1)}>{(scale * 100).toFixed(0)}%</Button>
+        <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.max(MIN_SCALE, s - 0.1))}>-</Button>
+       </div>
 
       <canvas
         ref={canvasRef}
@@ -517,6 +605,7 @@ export default function DrawingCanvas() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         style={{ touchAction: 'none', cursor: getCursor() }}
         className="flex-1 w-full h-full"
       />
