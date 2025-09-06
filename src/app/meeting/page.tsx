@@ -110,8 +110,8 @@ const generateParticipants = () => {
             id: i + 1,
             name: name,
             image: `${401 + i}`,
-            isMicOn: Math.random() > 0.5,
-            isVideoOn: Math.random() > 0.5,
+            isMicOn: false,
+            isVideoOn: false,
         };
     });
 };
@@ -324,14 +324,16 @@ export default function MeetingPage() {
             </Avatar>
         </div>
       )}
-      <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full" onClick={() => toggleMic(participant.id)}>
-          {participant.isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-        </Button>
-        <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full" onClick={() => toggleVideo(participant.id)}>
-          {participant.isVideoOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-        </Button>
-      </div>
+       {participant.id === 0 && (
+         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full" onClick={() => toggleMic(participant.id)}>
+            {participant.isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          </Button>
+          <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full" onClick={() => toggleVideo(participant.id)}>
+            {participant.isVideoOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+          </Button>
+        </div>
+       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-white text-sm flex items-center gap-2 pt-4">
         {participant.isMicOn ? <Mic className="h-4 w-4 text-green-400"/> : <MicOff className="h-4 w-4 text-red-500"/>}
         <span className="font-medium">{participant.name}</span>
@@ -378,13 +380,29 @@ export default function MeetingPage() {
                           <span>{p.name}</span>
                         </div>
                         <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                              <Label htmlFor={`mic-switch-${p.id}`} className="text-sm">Mic</Label>
-                              <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>                              <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
-                          </div>
+                           {p.id === 0 ? (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                      <Label htmlFor={`mic-switch-${p.id}`} className="text-sm">Mic</Label>
+                                      <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                      <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>
+                                      <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
+                                  </div>
+                                </>
+                            ) : (
+                                <>
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <MicOff className="h-4 w-4" />
+                                    <span className="text-sm">Mic Off</span>
+                                  </div>
+                                   <div className="flex items-center gap-2 text-muted-foreground">
+                                    <VideoOff className="h-4 w-4" />
+                                    <span className="text-sm">Video Off</span>
+                                  </div>
+                                </>
+                            )}
                         </div>
                       </div>
                     ))}
@@ -468,3 +486,5 @@ export default function MeetingPage() {
     </>
   );
 }
+
+    
