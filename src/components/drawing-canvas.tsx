@@ -70,16 +70,26 @@ export default function DrawingCanvas() {
 
   const drawAction = (context: CanvasRenderingContext2D, action: DrawingAction) => {
     context.beginPath();
-    context.strokeStyle = action.tool === 'eraser' ? '#000000' : action.color;
+    context.strokeStyle = action.color;
+    if (action.tool === 'eraser') {
+       context.strokeStyle = '#000000';
+    }
     context.lineWidth = action.lineWidth;
     context.lineCap = 'round';
     context.lineJoin = 'round';
 
     if (action.tool === 'pen' || action.tool === 'eraser') {
-      if(action.points.length > 0) {
+      if(action.points.length > 1) {
           context.moveTo(action.points[0].x, action.points[0].y);
-          action.points.forEach(point => context.lineTo(point.x, point.y));
+          for (let i = 1; i < action.points.length; i++) {
+            context.lineTo(action.points[i].x, action.points[i].y);
+          }
           context.stroke();
+      } else if (action.points.length === 1) {
+          context.fillStyle = context.strokeStyle;
+          context.beginPath();
+          context.arc(action.points[0].x, action.points[0].y, action.lineWidth / 2, 0, Math.PI * 2);
+          context.fill();
       }
     } else if (action.points.length === 2) {
       const [start, end] = action.points;
@@ -181,6 +191,7 @@ export default function DrawingCanvas() {
   }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.pointerType === 'touch' && tool !== 'hand') return;
     if (event.button !== 0) return; // Only main click
     const currentPoint = getCanvasCoordinates(event);
     setStartPoint(currentPoint);
@@ -206,9 +217,20 @@ export default function DrawingCanvas() {
         return;
     }
     
-    // Any other tool
     setInteractionMode('drawing');
     setSelectedActionIds(new Set());
+
+    const newAction: DrawingAction = {
+      id: Date.now(),
+      tool: tool as Exclude<Tool, 'hand'|'select'>,
+      color,
+      lineWidth,
+      points: [currentPoint]
+    };
+    
+    const newHistory = history.slice(0, historyIndex + 1);
+    setHistory([...newHistory, newAction]);
+    setHistoryIndex(newHistory.length);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -245,46 +267,26 @@ export default function DrawingCanvas() {
     }
     
     if (interactionMode === 'drawing') {
-        const context = getCanvasContext();
-        if (!context) return;
-        
-        const tempAction: DrawingAction = {
-            id: 0,
-            tool: tool as Exclude<Tool, 'hand'|'select'>,
-            color,
-            lineWidth,
-            points: [startPoint, currentPoint]
-        }
-        
-        redrawCanvas(); // Redraw base canvas
-        context.save();
-        context.translate(viewOffset.x, viewOffset.y);
-        drawAction(context, tempAction);
-        context.restore();
+      const currentHistory = history.slice(0, historyIndex + 1);
+      const lastAction = currentHistory[currentHistory.length - 1];
+      if (!lastAction) return;
+
+      if (tool === 'pen' || tool === 'eraser') {
+        const updatedPoints = [...lastAction.points, currentPoint];
+        const updatedAction = { ...lastAction, points: updatedPoints };
+        const newHistory = [...currentHistory.slice(0, -1), updatedAction];
+        setHistory(newHistory);
+      } else {
+        const updatedPoints = [startPoint, currentPoint];
+        const updatedAction = { ...lastAction, points: updatedPoints };
+        const newHistory = [...currentHistory.slice(0, -1), updatedAction];
+        setHistory(newHistory);
+        redrawCanvas();
+      }
     }
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const endPoint = getCanvasCoordinates(event);
-
-    if (interactionMode === 'drawing' && startPoint) {
-        let points = [startPoint, endPoint];
-        if (tool === 'pen' || tool === 'eraser') {
-            // A proper implementation would collect all points during move
-            // For simplicity, we just use start and end for now
-        }
-        const newAction: DrawingAction = {
-            id: Date.now(),
-            tool: tool as Exclude<Tool, 'hand'|'select'>,
-            color,
-            lineWidth,
-            points
-        };
-        const newHistory = history.slice(0, historyIndex + 1);
-        setHistory([...newHistory, newAction]);
-        setHistoryIndex(newHistory.length);
-    }
-    
     if (interactionMode === 'selecting' && selectionBox) {
         const selectionRect = {
             minX: Math.min(selectionBox.start.x, selectionBox.end.x),
@@ -303,6 +305,10 @@ export default function DrawingCanvas() {
             }
         });
         setSelectedActionIds(idsToSelect);
+    }
+    
+    if (interactionMode === 'drawing') {
+      // The history has already been updated in pointer move
     }
 
     setInteractionMode('none');
