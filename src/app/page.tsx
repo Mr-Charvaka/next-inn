@@ -11,7 +11,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, MessageCircle, ScreenShare, Users } from "lucide-react";
+import { Video, Edit3, MessageCircle, ScreenShare, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -19,8 +19,24 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import Image from 'next/image';
 
 type ViewMode = "video" | "draw" | "share";
+
+const participants = [
+  { name: 'Mei Lin', image: '401' },
+  { name: 'Kenji Tanaka', image: '402' },
+  { name: 'Fatima Al-Fassi', image: '403' },
+  { name: 'Dmitri Ivanov', image: '404' },
+  { name: 'Priya Patel', image: '405' },
+  { name: 'John Smith', image: '406' },
+  { name: 'Maria Garcia', image: '407' },
+  { name: 'David Kim', image: '408' },
+  { name: 'Lakshmi Rao', image: '409' },
+  { name: 'Ahmed Khan', image: '410' },
+  { name: 'Chloe Dubois', image: '411' },
+  { name: 'Santiago Rossi', image: '412' },
+];
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(true);
@@ -67,10 +83,20 @@ export default function Home() {
       default:
         // Placeholder for video grid
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 h-full overflow-auto">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-card rounded-lg flex items-center justify-center aspect-video">
-                <Users className="w-16 h-16 text-muted-foreground" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 h-full overflow-auto">
+            {participants.map((p, i) => (
+              <div key={i} className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group">
+                <Image 
+                  src={`https://picsum.photos/seed/${p.image}/400/300`} 
+                  alt={p.name} 
+                  width={400}
+                  height={300}
+                  data-ai-hint="person portrait"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-white text-sm">
+                  {p.name}
+                </div>
               </div>
             ))}
           </div>

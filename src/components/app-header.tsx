@@ -4,18 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export default function AppHeader() {
-  const [participantCount, setParticipantCount] = useState(600);
+  const [participantCount, setParticipantCount] = useState(12);
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    const participantInterval = setInterval(() => {
-      setParticipantCount((prevCount) => {
-        const fluctuation = Math.floor(Math.random() * 21) - 10;
-        const newCount = prevCount + fluctuation;
-        return newCount > 500 ? newCount : 500 + Math.floor(Math.random() * 20);
-      });
-    }, 3000);
-
     const handleOnlineStatus = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', handleOnlineStatus);
     window.addEventListener('offline', handleOnlineStatus);
@@ -24,7 +16,6 @@ export default function AppHeader() {
     handleOnlineStatus();
 
     return () => {
-      clearInterval(participantInterval);
       window.removeEventListener('online', handleOnlineStatus);
       window.removeEventListener('offline', handleOnlineStatus);
     };
