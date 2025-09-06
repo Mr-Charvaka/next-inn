@@ -290,7 +290,7 @@ export default function Home() {
       case 'video':
       default:
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 p-4 h-full overflow-auto">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 p-4 h-full overflow-auto">
             {participants.slice(0, 11).map((p) => (
               <ParticipantCard key={p.id} participant={p} />
             ))}
