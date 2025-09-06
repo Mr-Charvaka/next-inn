@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 
 type ViewMode = "video" | "draw" | "share";
 type VideoLayout = "speaker" | "grid";
+type ImageFit = "cover" | "contain";
 
 type Participant = {
   id: number;
@@ -132,6 +133,7 @@ export default function MeetingPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [imageFit, setImageFit] = useState<ImageFit>('cover');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -375,7 +377,10 @@ export default function MeetingPage() {
              width={400}
              height={300}
              data-ai-hint="person portrait"
-             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+             className={cn(
+                "w-full h-full transition-transform duration-300 group-hover:scale-105",
+                imageFit === 'cover' ? 'object-cover' : 'object-contain'
+             )}
            />
          )}
          {hasCameraPermission === false && host?.isVideoOn && (
@@ -541,6 +546,8 @@ export default function MeetingPage() {
           isRecording={isRecording} 
           onRecordingToggle={handleRecordingToggle}
           onEndCall={handleEndCall}
+          imageFit={imageFit}
+          onImageFitChange={setImageFit}
         />
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 h-full bg-secondary/30">

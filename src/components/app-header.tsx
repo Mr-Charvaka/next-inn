@@ -8,11 +8,15 @@ import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
 
+type ImageFit = 'cover' | 'contain';
+
 type AppHeaderProps = {
   participantCount: number;
   isRecording: boolean;
   onRecordingToggle: () => void;
   onEndCall: () => void;
+  imageFit: ImageFit;
+  onImageFitChange: (fit: ImageFit) => void;
 };
 
 const formatTime = (seconds: number) => {
@@ -22,7 +26,7 @@ const formatTime = (seconds: number) => {
   return `${h}:${m}:${s}`;
 };
 
-export default function AppHeader({ participantCount, isRecording, onRecordingToggle, onEndCall }: AppHeaderProps) {
+export default function AppHeader({ participantCount, isRecording, onRecordingToggle, onEndCall, imageFit, onImageFitChange }: AppHeaderProps) {
   const [isOnline, setIsOnline] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -100,6 +104,14 @@ export default function AppHeader({ participantCount, isRecording, onRecordingTo
                             <Label htmlFor="notif-control">Notifications</Label>
                             <Switch id="notif-control" defaultChecked/>
                         </div>
+                        <div className="grid grid-cols-2 items-center gap-4">
+                            <Label htmlFor="image-fit-control">Crop Fallback Image</Label>
+                            <Switch 
+                                id="image-fit-control" 
+                                checked={imageFit === 'cover'} 
+                                onCheckedChange={(checked) => onImageFitChange(checked ? 'cover' : 'contain')}
+                            />
+                        </div>
                     </div>
                 </div>
             </PopoverContent>
@@ -109,5 +121,3 @@ export default function AppHeader({ participantCount, isRecording, onRecordingTo
     </header>
   );
 }
-
-    
