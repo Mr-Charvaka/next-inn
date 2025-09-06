@@ -27,15 +27,35 @@ export default function DrawingCanvas() {
     return canvas.getContext('2d');
   }, []);
 
+  const saveHistory = useCallback(() => {
+    const canvas = canvasRef.current;
+    const context = getCanvasContext();
+    if (!canvas || !context) return;
+    
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+    setHistory(prevHistory => {
+        const newHistory = prevHistory.slice(0, historyIndex + 1);
+        if (newHistory.length >= 100) {
+            newHistory.shift();
+        }
+        newHistory.push(imageData);
+        setHistoryIndex(newHistory.length - 1);
+        return newHistory;
+    });
+  }, [getCanvasContext, historyIndex]);
+
   const redrawCanvas = useCallback(() => {
     const context = getCanvasContext();
-    if (!context || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!context || !canvas) return;
 
+    // Clear canvas
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Redraw from history
     if (historyIndex >= 0 && history[historyIndex]) {
       context.putImageData(history[historyIndex], 0, 0);
-    } else {
-      const dpr = window.devicePixelRatio || 1;
-      context.clearRect(0, 0, context.canvas.width / dpr, context.canvas.height / dpr);
     }
   }, [history, historyIndex, getCanvasContext]);
 
@@ -46,22 +66,22 @@ export default function DrawingCanvas() {
     
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.parentElement.getBoundingClientRect();
-
-    // Save history before resizing
-    if (history.length > 0 && historyIndex >= 0) {
-      saveHistory();
-    }
     
+    // Save current drawing
+    const lastDrawing = historyIndex >= 0 ? history[historyIndex] : null;
+
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     
     context.scale(dpr, dpr);
-    
-    // After resizing, the context is reset, so we need to set our styles again
-    contextRef.current = context;
-    redrawCanvas();
 
-  }, [getCanvasContext, redrawCanvas, history.length, historyIndex]);
+    if(lastDrawing) {
+        context.putImageData(lastDrawing, 0, 0);
+    }
+    
+    contextRef.current = context;
+
+  }, [getCanvasContext, history, historyIndex]);
 
 
   useEffect(() => {
@@ -72,36 +92,13 @@ export default function DrawingCanvas() {
     };
   }, [resizeCanvas]);
 
-  const saveHistory = useCallback(() => {
-    const canvas = canvasRef.current;
-    const context = getCanvasContext();
-    if (!canvas || !context) return;
-    
-    const dpr = window.devicePixelRatio || 1;
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-    const newHistory = history.slice(0, historyIndex + 1);
-    if (newHistory.length >= 100) {
-      newHistory.shift(); 
-    }
-    newHistory.push(imageData);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex, getCanvasContext]);
-
-
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       setHistoryIndex(prev => prev - 1);
     } else if (historyIndex === 0) {
       setHistoryIndex(-1);
-      const context = getCanvasContext();
-      if(context && canvasRef.current) {
-         const dpr = window.devicePixelRatio || 1;
-         context.clearRect(0, 0, canvasRef.current.width/dpr, canvasRef.current.height/dpr);
-      }
     }
-  }, [historyIndex, getCanvasContext]);
+  }, [historyIndex]);
 
   useEffect(() => {
     redrawCanvas();
@@ -150,12 +147,7 @@ export default function DrawingCanvas() {
       context.lineCap = 'round';
       context.lineJoin = 'round';
     } else {
-        if(historyIndex >= 0) {
-             context.putImageData(history[historyIndex], 0, 0);
-        } else {
-             const dpr = window.devicePixelRatio || 1;
-             context.clearRect(0, 0, context.canvas.width/dpr, context.canvas.height/dpr);
-        }
+        redrawCanvas();
     }
   };
 
@@ -218,8 +210,7 @@ export default function DrawingCanvas() {
     const canvas = canvasRef.current;
     const context = getCanvasContext();
     if (canvas && context) {
-      const dpr = window.devicePixelRatio || 1;
-      context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+      context.clearRect(0, 0, canvas.width, canvas.height);
       setHistory([]);
       setHistoryIndex(-1);
     }
