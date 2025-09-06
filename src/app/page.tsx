@@ -116,21 +116,20 @@ export default function Home() {
 
   const startRecording = async () => {
     try {
-      // For simplicity, we'll record the screen share stream if available, otherwise just audio.
-      // A more complex implementation could combine multiple streams.
-      const streamToRecord = screenStream || (await navigator.mediaDevices.getUserMedia({ audio: true }));
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { mediaSource: "screen" } as any,
+        audio: true,
+      });
       
-      if (!streamToRecord) {
-        toast({
-          variant: "destructive",
-          title: "Recording Failed",
-          description: "No media stream to record. Please start screen sharing or allow microphone access.",
-        });
-        return;
-      }
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const combinedStream = new MediaStream([
+        ...displayStream.getVideoTracks(),
+        ...audioStream.getAudioTracks(),
+      ]);
 
       recordedChunksRef.current = [];
-      mediaRecorderRef.current = new MediaRecorder(streamToRecord, {
+      mediaRecorderRef.current = new MediaRecorder(combinedStream, {
         mimeType: 'video/webm; codecs=vp9'
       });
 
@@ -178,6 +177,7 @@ export default function Home() {
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
     setIsRecording(false);
   };
