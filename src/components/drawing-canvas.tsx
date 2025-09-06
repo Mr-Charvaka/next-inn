@@ -74,6 +74,7 @@ export default function DrawingCanvas() {
   const pointersRef = useRef<Map<number, { point: Point; type: string }>>(new Map());
   const lastGestureDistRef = useRef<number | null>(null);
   const lastGestureMidpointRef = useRef<Point | null>(null);
+  const currentDrawingActionRef = useRef<DrawingAction | null>(null);
 
   const colors = ['#FFFFFF', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6', '#A855F7'];
 
@@ -277,9 +278,9 @@ export default function DrawingCanvas() {
     
     const pointers = Array.from(pointersRef.current.values());
     
-    // Allow gestures only if two fingers are used, not a pen and a finger
-    if (pointers.length > 1 && pointers.every(p => p.type === 'touch')) {
+    if (pointers.length > 1) {
         setInteractionMode('gesturing');
+        currentDrawingActionRef.current = null;
         return;
     }
 
@@ -316,12 +317,9 @@ export default function DrawingCanvas() {
         return;
     }
     
-    // Stylus-only drawing logic
     const isDrawingTool = ['pen', 'eraser', 'rect', 'circle'].includes(tool);
-    if (isDrawingTool && event.pointerType === 'touch') {
-        // If it's a touch event with a drawing tool, don't start drawing.
-        // This allows touch for panning/zooming but not for drawing.
-        return;
+    if (isDrawingTool && event.pointerType === 'touch' && pointers.length === 1) {
+      return;
     }
     
     setInteractionMode('drawing');
@@ -335,35 +333,22 @@ export default function DrawingCanvas() {
       points: [currentPoint]
     };
     
-    const newHistory = history.slice(0, historyIndex + 1);
-    setHistory([...newHistory, newAction]);
-    setHistoryIndex(newHistory.length);
+    currentDrawingActionRef.current = newAction;
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const currentScreenPoint = getCanvasCoordinates(event);
 
     if (pointersRef.current.has(event.pointerId)) {
         pointersRef.current.set(event.pointerId, {
-            point: currentScreenPoint,
+            point: getCanvasCoordinates(event),
             type: event.pointerType
         });
     }
-    
+
+    const currentScreenPoint = getCanvasCoordinates(event);
     const currentPoint = screenToWorld(currentScreenPoint);
     const startPoint = startPointRef.current;
-    
-    if (tool === 'select' && interactionMode === 'none') {
-        const selectedActions = history.filter(a => selectedActionIds.has(a.id));
-        const selectionBox = getCombinedBoundingBox(selectedActions);
-        if (selectionBox) {
-            const handle = getHandleAtPoint(currentPoint, selectionBox);
-            setHoveredHandle(handle);
-        } else {
-            setHoveredHandle(null);
-        }
-    }
     
     const pointers = Array.from(pointersRef.current.values());
 
@@ -394,6 +379,7 @@ export default function DrawingCanvas() {
 
         lastGestureDistRef.current = dist;
         lastGestureMidpointRef.current = midpoint;
+        redrawCanvas();
         return;
     }
 
@@ -407,7 +393,7 @@ export default function DrawingCanvas() {
         };
         const dx = currentScreenPoint.x - startScreenPoint.x;
         const dy = currentScreenPoint.y - startScreenPoint.y;
-        setViewOffset(prev => ({x: prev.x + dx, y: prev.y + dy}));
+        setViewOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
         return;
     }
 
@@ -470,26 +456,29 @@ export default function DrawingCanvas() {
             y: startPoint.y * scale + viewOffset.y
         }
         setSelectionBox({ start: screenStartPoint, end: currentScreenPoint });
+        redrawCanvas();
         return;
     }
     
     if (interactionMode === 'drawing') {
-      const currentHistory = history.slice(0, historyIndex + 1);
-      const lastAction = currentHistory[currentHistory.length - 1];
-      if (!lastAction) return;
+      const currentAction = currentDrawingActionRef.current;
+      if (!currentAction) return;
 
-      if (tool === 'pen' || tool === 'eraser') {
-        const updatedPoints = [...lastAction.points, currentPoint];
-        const updatedAction = { ...lastAction, points: updatedPoints };
-        const newHistory = [...currentHistory.slice(0, -1), updatedAction];
-        setHistory(newHistory);
-      } else {
-        const updatedPoints = [startPoint, currentPoint];
-        const updatedAction = { ...lastAction, points: updatedPoints };
-        const newHistory = [...currentHistory.slice(0, -1), updatedAction];
-        setHistory(newHistory);
-        redrawCanvas();
-      }
+      const context = getCanvasContext();
+      if (!context) return;
+      
+      const coalescedEvents = event.getCoalescedEvents();
+      const newPoints = coalescedEvents.map(e => screenToWorld(getCanvasCoordinates(e)));
+
+      currentAction.points.push(...newPoints);
+
+      redrawCanvas();
+      
+      context.save();
+      context.translate(viewOffset.x, viewOffset.y);
+      context.scale(scale, scale);
+      drawAction(context, currentAction);
+      context.restore();
     }
   };
 
@@ -497,12 +486,22 @@ export default function DrawingCanvas() {
     event.currentTarget.releasePointerCapture(event.pointerId);
     pointersRef.current.delete(event.pointerId);
 
+    if (currentDrawingActionRef.current) {
+        if(currentDrawingActionRef.current.points.length > 0) {
+            const newHistory = history.slice(0, historyIndex + 1);
+            setHistory([...newHistory, currentDrawingActionRef.current]);
+            setHistoryIndex(newHistory.length);
+        }
+        currentDrawingActionRef.current = null;
+    }
+
     if (interactionMode === 'gesturing') {
         if (pointersRef.current.size < 2) {
             setInteractionMode('none');
             lastGestureDistRef.current = null;
             lastGestureMidpointRef.current = null;
         }
+        redrawCanvas();
         return;
     }
 
@@ -529,6 +528,7 @@ export default function DrawingCanvas() {
     startPointRef.current = null;
     setSelectionBox(null);
     setResizingHandle(null);
+    redrawCanvas();
   };
   
   const undo = () => {
@@ -554,11 +554,15 @@ export default function DrawingCanvas() {
   };
   
   const getCursor = () => {
-    if (hoveredHandle) {
-        if (hoveredHandle === 'topLeft' || hoveredHandle === 'bottomRight') return 'nwse-resize';
-        if (hoveredHandle === 'topRight' || hoveredHandle === 'bottomLeft') return 'nesw-resize';
-        if (hoveredHandle === 'top' || hoveredHandle === 'bottom') return 'ns-resize';
-        if (hoveredHandle === 'left' || hoveredHandle === 'right') return 'ew-resize';
+    if(interactionMode === 'none' && tool === 'select') {
+        const selectedActions = history.filter(a => selectedActionIds.has(a.id));
+        const selectionBox = getCombinedBoundingBox(selectedActions);
+        if (selectionBox && hoveredHandle) {
+             if (hoveredHandle === 'topLeft' || hoveredHandle === 'bottomRight') return 'nwse-resize';
+             if (hoveredHandle === 'topRight' || hoveredHandle === 'bottomLeft') return 'nesw-resize';
+             if (hoveredHandle === 'top' || hoveredHandle === 'bottom') return 'ns-resize';
+             if (hoveredHandle === 'left' || hoveredHandle === 'right') return 'ew-resize';
+        }
     }
     if (tool === 'hand' || interactionMode === 'panning') {
       return interactionMode === 'panning' ? 'grabbing' : 'grab';
@@ -568,6 +572,31 @@ export default function DrawingCanvas() {
     }
     return 'crosshair';
   };
+  
+  useEffect(() => {
+    const handleMouseMoveForCursor = (event: MouseEvent) => {
+      if (tool === 'select' && interactionMode === 'none') {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const screenPoint = {
+            x: (event.clientX - rect.left) * (window.devicePixelRatio || 1),
+            y: (event.clientY - rect.top) * (window.devicePixelRatio || 1)
+        }
+        const worldPoint = screenToWorld(screenPoint);
+        const selectedActions = history.filter(a => selectedActionIds.has(a.id));
+        const selectionBox = getCombinedBoundingBox(selectedActions);
+        if (selectionBox) {
+            setHoveredHandle(getHandleAtPoint(worldPoint, selectionBox));
+        } else {
+            setHoveredHandle(null);
+        }
+      }
+    };
+    
+    window.addEventListener('mousemove', handleMouseMoveForCursor);
+    return () => window.removeEventListener('mousemove', handleMouseMoveForCursor);
+  }, [tool, interactionMode, history, selectedActionIds, scale, viewOffset]);
 
   return (
     <div className="w-full h-full bg-background relative overflow-hidden flex flex-col">
