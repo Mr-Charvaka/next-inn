@@ -39,28 +39,16 @@ export default function DrawingCanvas() {
     return canvas.getContext('2d');
   }, []);
 
-  const getCoordinates = (event: React.MouseEvent | React.TouchEvent): Point => {
+  const getCoordinates = (event: React.PointerEvent): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     
-    let clientX, clientY;
-    if ('touches' in event && (event as React.TouchEvent).touches.length > 0) {
-        clientX = (event as React.TouchEvent).touches[0].clientX;
-        clientY = (event as React.TouchEvent).touches[0].clientY;
-    } else if ('changedTouches' in event && (event as React.TouchEvent).changedTouches.length > 0){
-        clientX = (event as React.TouchEvent).changedTouches[0].clientX;
-        clientY = (event as React.TouchEvent).changedTouches[0].clientY;
-    } else {
-      clientX = (event as React.MouseEvent).clientX;
-      clientY = (event as React.MouseEvent).clientY;
-    }
-    
     const dpr = window.devicePixelRatio || 1;
-    return { x: (clientX - rect.left) * dpr, y: (clientY - rect.top) * dpr };
+    return { x: (event.clientX - rect.left) * dpr, y: (event.clientY - rect.top) * dpr };
   }
 
-  const getCanvasCoordinates = (event: React.MouseEvent | React.TouchEvent): Point => {
+  const getCanvasCoordinates = (event: React.PointerEvent): Point => {
     const coords = getCoordinates(event);
     return { x: coords.x - viewOffset.x, y: coords.y - viewOffset.y };
   }
@@ -135,27 +123,28 @@ export default function DrawingCanvas() {
     };
   }, [resizeCanvas]);
 
-  const startAction = (event: React.MouseEvent | React.TouchEvent) => {
+  const startAction = (event: React.PointerEvent) => {
     event.preventDefault();
     if (tool === 'hand') {
       setIsPanning(true);
       panStartRef.current = getCoordinates(event);
     } else {
+      if (event.pointerType === 'touch') return; // Palm rejection
       setIsDrawing(true);
       const startPoint = getCanvasCoordinates(event);
       setCurrentPath([startPoint]);
     }
   };
 
-  const moveAction = (event: React.MouseEvent | React.TouchEvent) => {
+  const moveAction = (event: React.PointerEvent) => {
     event.preventDefault();
-    if (isPanning) {
+    if (isPanning && panStartRef.current) {
       const currentPanPoint = getCoordinates(event);
       setViewOffset(prevOffset => {
           if (!panStartRef.current) return prevOffset;
           return {
-              x: prevOffset.x + (currentPanPoint.x - panStartRef.current.x),
-              y: prevOffset.y + (currentPanPoint.y - panStartRef.current.y),
+              x: prevOffset.x + (currentPanPoint.x - panStartRef.current!.x),
+              y: prevOffset.y + (currentPanPoint.y - panStartRef.current!.y),
           }
       });
       panStartRef.current = currentPanPoint;
@@ -300,13 +289,10 @@ export default function DrawingCanvas() {
 
       <canvas
         ref={canvasRef}
-        onMouseDown={startAction}
-        onMouseMove={moveAction}
-        onMouseUp={finishAction}
-        onMouseLeave={finishAction}
-        onTouchStart={startAction}
-        onTouchMove={moveAction}
-        onTouchEnd={finishAction}
+        onPointerDown={startAction}
+        onPointerMove={moveAction}
+        onPointerUp={finishAction}
+        onPointerLeave={finishAction}
         style={{ touchAction: 'none', cursor: getCursor() }}
         className="flex-1 w-full h-full"
       />
