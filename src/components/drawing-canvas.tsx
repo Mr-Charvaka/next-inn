@@ -70,7 +70,7 @@ export default function DrawingCanvas() {
   const [resizingHandle, setResizingHandle] = useState<HandlePosition | null>(null);
   const [hoveredHandle, setHoveredHandle] = useState<HandlePosition | null>(null);
   
-  const pointersRef = useRef<Map<number, Point>>(new Map());
+  const pointersRef = useRef<Map<number, { point: Point; type: string }>>(new Map());
   const lastGestureDistRef = useRef<number | null>(null);
   const lastGestureMidpointRef = useRef<Point | null>(null);
 
@@ -265,13 +265,19 @@ export default function DrawingCanvas() {
     if (event.button !== 0) return; // Only main click
     event.currentTarget.setPointerCapture(event.pointerId);
 
+    pointersRef.current.set(event.pointerId, { 
+      point: getCanvasCoordinates(event),
+      type: event.pointerType 
+    });
+
     const currentScreenPoint = getCanvasCoordinates(event);
-    pointersRef.current.set(event.pointerId, currentScreenPoint);
-    
     const currentPoint = screenToWorld(currentScreenPoint);
     startPointRef.current = currentPoint;
     
-    if (pointersRef.current.size > 1) {
+    const pointers = Array.from(pointersRef.current.values());
+    
+    // Allow gestures only if two fingers are used, not a pen and a finger
+    if (pointers.length > 1 && pointers.every(p => p.type === 'touch')) {
         setInteractionMode('gesturing');
         return;
     }
@@ -330,7 +336,10 @@ export default function DrawingCanvas() {
     const currentScreenPoint = getCanvasCoordinates(event);
 
     if (pointersRef.current.has(event.pointerId)) {
-        pointersRef.current.set(event.pointerId, currentScreenPoint);
+        pointersRef.current.set(event.pointerId, {
+            point: currentScreenPoint,
+            type: event.pointerType
+        });
     }
     
     const currentPoint = screenToWorld(currentScreenPoint);
@@ -346,12 +355,12 @@ export default function DrawingCanvas() {
             setHoveredHandle(null);
         }
     }
+    
+    const pointers = Array.from(pointersRef.current.values());
 
-    if (interactionMode === 'gesturing') {
-        if (pointersRef.current.size < 2) return;
-        const pointers = Array.from(pointersRef.current.values());
-        const p1 = pointers[0];
-        const p2 = pointers[1];
+    if (interactionMode === 'gesturing' && pointers.length > 1) {
+        const p1 = pointers[0].point;
+        const p2 = pointers[1].point;
         
         const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
         const midpoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
@@ -553,7 +562,7 @@ export default function DrawingCanvas() {
 
   return (
     <div className="w-full h-full bg-background relative overflow-hidden flex flex-col">
-       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-1">
+       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-1 select-none">
         <Button variant={tool === 'select' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('select')}><MousePointer2/></Button>
         <Button variant={tool === 'hand' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('hand')}><Hand/></Button>
         <div className="w-px h-8 bg-border mx-1" />
@@ -567,7 +576,7 @@ export default function DrawingCanvas() {
         <Button variant="ghost" size="icon" onClick={clearCanvas}><Trash2 className="text-destructive/80"/></Button>
       </div>
       
-       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-2">
+       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-2 select-none">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="ghost" size="icon" className='w-auto px-2'>
@@ -593,7 +602,7 @@ export default function DrawingCanvas() {
           </PopoverContent>
         </Popover>
       </div>
-       <div className="absolute bottom-4 right-4 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-2">
+       <div className="absolute bottom-4 right-4 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-2 select-none">
         <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.min(MAX_SCALE, s + 0.1))}>+</Button>
         <Button variant="ghost" size="icon" onClick={() => setScale(1)}>{(scale * 100).toFixed(0)}%</Button>
         <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.max(MIN_SCALE, s - 0.1))}>-</Button>
