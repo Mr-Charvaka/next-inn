@@ -38,18 +38,18 @@ type Participant = {
 };
 
 const initialParticipants: Participant[] = [
-  { id: 1, name: 'Aarav Sharma', image: '401', isMicOn: true, isVideoOn: false },
+  { id: 1, name: 'Aarav Sharma', image: '401', isMicOn: false, isVideoOn: false },
   { id: 2, name: 'Vivaan Singh', image: '402', isMicOn: false, isVideoOn: false },
-  { id: 3, name: 'Aditya Kumar', image: '403', isMicOn: true, isVideoOn: false },
-  { id: 4, name: 'Arjun Gupta', image: '404', isMicOn: true, isVideoOn: false },
-  { id: 5, name: 'Sai Prasad', image: '405', isMicOn: true, isVideoOn: false },
+  { id: 3, name: 'Aditya Kumar', image: '403', isMicOn: false, isVideoOn: false },
+  { id: 4, name: 'Arjun Gupta', image: '404', isMicOn: false, isVideoOn: false },
+  { id: 5, name: 'Sai Prasad', image: '405', isMicOn: false, isVideoOn: false },
   { id: 6, name: 'Reyansh Reddy', image: '406', isMicOn: false, isVideoOn: false },
-  { id: 7, name: 'Krishna Kumar', image: '407', isMicOn: true, isVideoOn: false },
-  { id: 8, name: 'Ishaan Patel', image: '408', isMicOn: true, isVideoOn: false },
-  { id: 9, name: 'Anvi Sharma', image: '409', isMicOn: true, isVideoOn: false },
+  { id: 7, name: 'Krishna Kumar', image: '407', isMicOn: false, isVideoOn: false },
+  { id: 8, name: 'Ishaan Patel', image: '408', isMicOn: false, isVideoOn: false },
+  { id: 9, name: 'Anvi Sharma', image: '409', isMicOn: false, isVideoOn: false },
   { id: 10, name: 'Diya Singh', image: '410', isMicOn: false, isVideoOn: false },
-  { id: 11, name: 'Saanvi Gupta', image: '411', isMicOn: true, isVideoOn: false },
-  { id: 12, name: 'Aadhya Reddy', image: '412', isMicOn: true, isVideoOn: false },
+  { id: 11, name: 'Saanvi Gupta', image: '411', isMicOn: false, isVideoOn: false },
+  { id: 12, name: 'Aadhya Reddy', image: '412', isMicOn: false, isVideoOn: false },
 ];
 
 const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
@@ -58,7 +58,7 @@ const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
         id: i + 1,
         name: `Participant ${i + 1}`,
         image: `${413 + i}`,
-        isMicOn: Math.random() > 0.5,
+        isMicOn: false,
         isVideoOn: false,
     };
 });
@@ -274,8 +274,7 @@ export default function Home() {
                               <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
                           </div>
                           <div className="flex items-center gap-2">
-                              <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>
-                              <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
+                              <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>                              <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
                           </div>
                         </div>
                       </div>
@@ -374,3 +373,5 @@ export default function Home() {
     </>
   );
 }
+
+    
