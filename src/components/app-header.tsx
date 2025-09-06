@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export default function AppHeader() {
-  const [participantCount, setParticipantCount] = useState(12);
+  const [participantCount, setParticipantCount] = useState(800);
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
