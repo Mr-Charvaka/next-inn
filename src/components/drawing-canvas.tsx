@@ -149,12 +149,15 @@ export default function DrawingCanvas() {
 
   const moveAction = (event: React.MouseEvent | React.TouchEvent) => {
     event.preventDefault();
-    if (isPanning && panStartRef.current) {
+    if (isPanning) {
       const currentPanPoint = getCoordinates(event);
-      setViewOffset(prevOffset => ({
-        x: prevOffset.x + (currentPanPoint.x - panStartRef.current!.x),
-        y: prevOffset.y + (currentPanPoint.y - panStartRef.current!.y),
-      }));
+      setViewOffset(prevOffset => {
+          if (!panStartRef.current) return prevOffset;
+          return {
+              x: prevOffset.x + (currentPanPoint.x - panStartRef.current.x),
+              y: prevOffset.y + (currentPanPoint.y - panStartRef.current.y),
+          }
+      });
       panStartRef.current = currentPanPoint;
     }
 
