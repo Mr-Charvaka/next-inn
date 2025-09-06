@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: 'Next Inn',
   description: 'A simulated meeting experience with interactive tools.',
+  icons: {
+    icon: 'https://i.ibb.co/LX5fmmXp/Generated-Image-September-06-2025-11-49-AM-removebg-preview.png',
+  },
 };
 
 export default function RootLayout({
