@@ -136,6 +136,9 @@ export default function MeetingPage() {
   const streamRef = useRef<MediaStream | null>(null);
   
   const { toast } = useToast();
+  
+  const host = participants.find(p => p.id === 0);
+  const otherParticipants = participants.filter(p => p.id !== 0);
 
   useEffect(() => {
     // Start with the teacher
@@ -352,9 +355,7 @@ export default function MeetingPage() {
     window.open('/polls', '_blank', 'width=500,height=700,resizable=yes,scrollbars=yes');
   }
   
-  const ParticipantCard = ({ participant }: { participant: Participant }) => {
-    const host = participants.find(p => p.id === 0);
-
+  const ParticipantCard = ({ participant, isHostCard = false }: { participant: Participant, isHostCard?: boolean }) => {
     return (
     <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group border border-transparent hover:border-primary transition-colors">
       {participant.id === 0 ? (
@@ -431,67 +432,79 @@ export default function MeetingPage() {
       case 'video':
       default:
         return (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4 p-4 h-full overflow-auto">
-            {participants.slice(0, 11).map((p) => (
-              <ParticipantCard key={p.id} participant={p} />
-            ))}
-            <Dialog open={isParticipantListOpen} onOpenChange={setIsParticipantListOpen}>
-              <DialogTrigger asChild>
-                <button className="bg-secondary rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group cursor-pointer hover:bg-primary/10 border-2 border-dashed border-primary/20 hover:border-primary/50 transition-colors">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Users className="h-10 w-10" />
-                        <span>View All ({participants.length})</span>
-                    </div>
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>All Participants ({participants.length})</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="flex-1 -mr-6">
-                  <div className="space-y-4 pr-6">
-                    {participants.map(p => (
-                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
-                        <div className="flex items-center gap-4">
-                          <Avatar>
-                             <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
-                                {p.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span>{p.name}</span>
+          <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+            <ResizablePanel defaultSize={75}>
+              <div className="flex items-center justify-center h-full w-full p-4">
+                {host && <ParticipantCard participant={host} isHostCard={true} />}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
+              <ScrollArea className="h-full w-full">
+                <div className="p-4 space-y-4">
+                  {otherParticipants.slice(0,10).map((p) => (
+                    <ParticipantCard key={p.id} participant={p} />
+                  ))}
+                  <Dialog open={isParticipantListOpen} onOpenChange={setIsParticipantListOpen}>
+                    <DialogTrigger asChild>
+                      <button className="bg-secondary rounded-lg w-full flex items-center justify-center aspect-video relative overflow-hidden group cursor-pointer hover:bg-primary/10 border-2 border-dashed border-primary/20 hover:border-primary/50 transition-colors">
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                              <Users className="h-10 w-10" />
+                              <span>View All ({participants.length})</span>
+                          </div>
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>All Participants ({participants.length})</DialogTitle>
+                      </DialogHeader>
+                      <ScrollArea className="flex-1 -mr-6">
+                        <div className="space-y-4 pr-6">
+                          {participants.map(p => (
+                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
+                              <div className="flex items-center gap-4">
+                                <Avatar>
+                                   <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
+                                      {p.name.split(' ').map(n => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>{p.name}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                 {p.id === 0 ? (
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor={`mic-switch-${p.id}`} className="text-sm">Mic</Label>
+                                            <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>
+                                            <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
+                                        </div>
+                                      </>
+                                  ) : (
+                                      <>
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                          <MicOff className="h-4 w-4" />
+                                          <span className="text-sm">Mic Off</span>
+                                        </div>
+                                         <div className="flex items-center gap-2 text-muted-foreground">
+                                          <VideoOff className="h-4 w-4" />
+                                          <span className="text-sm">Video Off</span>
+                                        </div>
+                                      </>
+                                  )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-4">
-                           {p.id === 0 ? (
-                                <>
-                                  <div className="flex items-center gap-2">
-                                      <Label htmlFor={`mic-switch-${p.id}`} className="text-sm">Mic</Label>
-                                      <Switch id={`mic-switch-${p.id}`} checked={p.isMicOn} onCheckedChange={() => toggleMic(p.id)} />
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                      <Label htmlFor={`video-switch-${p.id}`} className="text-sm">Video</Label>
-                                      <Switch id={`video-switch-${p.id}`} checked={p.isVideoOn} onCheckedChange={() => toggleVideo(p.id)} />
-                                  </div>
-                                </>
-                            ) : (
-                                <>
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <MicOff className="h-4 w-4" />
-                                    <span className="text-sm">Mic Off</span>
-                                  </div>
-                                   <div className="flex items-center gap-2 text-muted-foreground">
-                                    <VideoOff className="h-4 w-4" />
-                                    <span className="text-sm">Video Off</span>
-                                  </div>
-                                </>
-                            )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-          </div>
+                      </ScrollArea>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </ScrollArea>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         );
     }
   }
