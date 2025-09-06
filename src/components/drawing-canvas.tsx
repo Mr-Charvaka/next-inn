@@ -201,6 +201,7 @@ export default function DrawingCanvas() {
 
   const startAction = (event: React.PointerEvent) => {
     event.preventDefault();
+    if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
     const startPoint = getCanvasCoordinates(event);
     actionStartRef.current = startPoint;
     
@@ -228,7 +229,6 @@ export default function DrawingCanvas() {
       }
     }
     else {
-      if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
       setInteractionMode('drawing');
       setCurrentPath([startPoint]);
       setSelectedActionId(null);
@@ -440,5 +440,3 @@ export default function DrawingCanvas() {
     </div>
   );
 }
-
-    
