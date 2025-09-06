@@ -249,9 +249,9 @@ export default function MeetingPage() {
       setViewMode('video');
     } else {
       try {
+        // For iPad/Safari, do not request audio, as it's not supported with getDisplayMedia
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: true,
         });
         stream.getVideoTracks()[0].onended = () => {
             setScreenStream(null);
