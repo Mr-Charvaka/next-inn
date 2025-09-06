@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,55 @@ export default function PollPanel() {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [newPollQuestion, setNewPollQuestion] = useState('');
   const [newPollOptions, setNewPollOptions] = useState<string[]>(['', '']);
+  const pollIntervals = useRef<Record<number, NodeJS.Timeout>>({});
+
+  useEffect(() => {
+    // Function to clean up intervals
+    const cleanupIntervals = () => {
+      Object.values(pollIntervals.current).forEach(clearInterval);
+      pollIntervals.current = {};
+    };
+
+    // Clean up on component unmount
+    return () => cleanupIntervals();
+  }, []);
+
+  useEffect(() => {
+    const activePolls = polls.filter(p => !p.voted);
+
+    activePolls.forEach(poll => {
+      if (!pollIntervals.current[poll.id]) {
+        pollIntervals.current[poll.id] = setInterval(() => {
+          setPolls(prevPolls => 
+            prevPolls.map(p => {
+              if (p.id === poll.id && !p.voted) {
+                 const randomOptionIndex = Math.floor(Math.random() * p.options.length);
+                 const newOptions = p.options.map((option, index) => {
+                   if (index === randomOptionIndex) {
+                     return { ...option, votes: option.votes + 1 };
+                   }
+                   return option;
+                 });
+                 return { ...p, options: newOptions };
+              }
+              return p;
+            })
+          );
+        }, Math.random() * (4000 - 1500) + 1500); // vote every 1.5-4 seconds
+      }
+    });
+
+    // Cleanup intervals for polls that have been voted on or deleted
+    Object.keys(pollIntervals.current).forEach(pollId => {
+      const pollIdNum = parseInt(pollId, 10);
+      const poll = polls.find(p => p.id === pollIdNum);
+      if (!poll || poll.voted) {
+        clearInterval(pollIntervals.current[pollIdNum]);
+        delete pollIntervals.current[pollIdNum];
+      }
+    });
+
+  }, [polls]);
 
   const handleAddOption = () => {
     if (newPollOptions.length < 5) {
@@ -63,6 +113,12 @@ export default function PollPanel() {
   const handleVote = (pollId: number, optionId: number) => {
     setPolls(polls.map(poll => {
       if (poll.id === pollId && !poll.voted) {
+        // Clear the interval for this poll
+        if (pollIntervals.current[pollId]) {
+          clearInterval(pollIntervals.current[pollId]);
+          delete pollIntervals.current[pollId];
+        }
+
         const newOptions = poll.options.map(option => {
           if (option.id === optionId) {
             return { ...option, votes: option.votes + 1 };
@@ -76,6 +132,10 @@ export default function PollPanel() {
   };
   
   const handleDeletePoll = (pollId: number) => {
+    if (pollIntervals.current[pollId]) {
+      clearInterval(pollIntervals.current[pollId]);
+      delete pollIntervals.current[pollId];
+    }
     setPolls(polls.filter(poll => poll.id !== pollId));
   }
 
