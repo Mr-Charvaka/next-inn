@@ -144,28 +144,35 @@ export default function MeetingPage() {
     };
     setParticipants([teacher]);
 
-    // Then add other participants over time
-    const interval = setInterval(() => {
-      setParticipants(prev => {
-        const currentCount = prev.length - 1; // -1 for the teacher
-        if (currentCount >= allParticipants.length) {
-          clearInterval(interval);
-          return prev;
-        }
+    // Delay before participants start joining
+    const joinDelay = setTimeout(() => {
+        // Then add other participants over time
+        const interval = setInterval(() => {
+          setParticipants(prev => {
+            const currentCount = prev.length - 1; // -1 for the teacher
+            if (currentCount >= allParticipants.length) {
+              clearInterval(interval);
+              return prev;
+            }
 
-        const newParticipantCount = Math.floor(Math.random() * 10) + 1;
-        const nextParticipants = allParticipants.slice(currentCount, currentCount + newParticipantCount);
+            const newParticipantCount = Math.floor(Math.random() * 10) + 1;
+            const nextParticipants = allParticipants.slice(currentCount, currentCount + newParticipantCount);
+            
+            if (nextParticipants.length > 0) {
+                return [...prev, ...nextParticipants];
+            } else {
+                clearInterval(interval);
+                return prev;
+            }
+          });
+        }, Math.random() * (5000 - 1000) + 1000); // Add participants every 1-5 seconds
         
-        if (nextParticipants.length > 0) {
-            return [...prev, ...nextParticipants];
-        } else {
-            clearInterval(interval);
-            return prev;
-        }
-      });
-    }, Math.random() * (5000 - 1000) + 1000); // Add participants every 1-5 seconds
+        // Cleanup interval on component unmount
+        return () => clearInterval(interval);
+    }, 360000); // 6 minutes delay
 
-    return () => clearInterval(interval);
+    // Cleanup timeout on component unmount
+    return () => clearTimeout(joinDelay);
   }, []);
 
   const handleScreenShareToggle = async () => {
