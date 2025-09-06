@@ -243,7 +243,8 @@ export default function DrawingCanvas() {
   }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (event.pointerType === 'touch' && tool !== 'hand') return;
+    const isTouch = event.pointerType === 'touch' && event.height < 1.1 && event.width < 1.1;
+    if (isTouch && tool !== 'hand') return;
     if (event.button !== 0) return; // Only main click
     event.currentTarget.setPointerCapture(event.pointerId);
 
