@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -7,7 +8,7 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'SimuMeet',
+  title: 'Next Inn',
   description: 'A simulated meeting experience with interactive tools.',
 };
 
@@ -25,3 +26,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    
