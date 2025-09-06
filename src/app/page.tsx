@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
 import PollPanel from "@/components/poll-panel";
@@ -94,30 +94,32 @@ const participantNames = [
     "Shrivalli Patel", "Karthik Patel", "Manasi Mehta", "Amol Mehta", "Oorja Rajput", "Lokendra Rajput", "Kashvi Goyal", "Girdhar Goyal", "Bhawna Malhotra", "Veer Malhotra", "Ambalika Gupta", "Subhash Gupta", "Nishka Menon", 
     "Kanhaiya Menon", "Anugya Joshi", "Sharad Joshi", "Namrata Agarwal", "Surendra Agarwal", "Yogita Bansal", "Amar Bansal", "Rajshree Rathore", "Rakesh Rathore", "Sunanda Verma", "Murtaza Verma", "Shylaja Pillai", "Yusuf Pillai", 
     "Shrilekha Kulkarni", "Keshor Kulkarni", "Radhya Jadhav", "Anil Jadhav", "Mallika Shetty", "Alpesh Shetty", "Lalita Pawar", "Anoop Pawar", "Sahana Krishna", "Somendra Krishna", "Aditri Sharma", "Hemendra Sharma", "Anshi Singh", 
-    "Sushant Singh", "Damini Iyer", "Ajeet Iyer", "Vidisha Reddy", "Gokul Reddy", "Aarya Nair", "Ravi Nair", "Hiral Choudhary", "Haroon Choudhary", "Suchitra Desai", "Nadeem Desai", "Shireen Patel", "Harikrishna Patel", 
-    "Maitreyee Mehta", "Rajan Mehta", "Yogini Rajput", "Subho Rajput", "Vaishali Goyal", "Kapil Goyal", "Krisha Malhotra", "Manu Malhotra", "Leher Gupta", "Asgar Gupta", "Simona Menon", "Pritam Menon", "Sandhya Joshi", 
+    "Sushant Singh", "Damini Iyer", "Ajeet Iyer", "Vidisha Reddy", "Gokul Reddy", "Aarya Nair", "Ravi Nair", "Hiral Choudhary", "Haroon Choudhary", "Suchitra Desai", "Nadeem Desai", "Shireen Patel", "Harikrishna Patel", "Maitreyee Mehta", "Rajan Mehta", "Yogini Rajput", "Subho Rajput", "Vaishali Goyal", "Kapil Goyal", "Krisha Malhotra", "Manu Malhotra", "Leher Gupta", "Asgar Gupta", "Simona Menon", "Pritam Menon", "Sandhya Joshi", 
     "Arindam Joshi", "Shraddha Agarwal", "Dilip Agarwal", "Ishana Bansal", "Shakti Bansal", "Chandrika Rathore", "Ravish Rathore", "Smruti Verma", "Subhaan Verma", "Natasha Pillai", "Zaheer Pillai", "Monisha Kulkarni", 
     "Naveen Kulkarni", "Darshita Jadhav", "Shiva Jadhav", "Suman Shetty", "Surya Shetty", "Riya Pawar", "Sanjit Pawar", "Saloni Krishna", "Manas Krishna"
-].sort(() => Math.random() - 0.5);
+];
 
+const generateParticipants = () => {
+    return Array.from({ length: 800 }, (_, i) => {
+        const name = participantNames[i % participantNames.length];
+        return {
+            id: i + 1,
+            name: name,
+            image: `${401 + i}`,
+            isMicOn: false,
+            isVideoOn: false,
+        };
+    });
+};
 
-const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
-    const name = participantNames[i % participantNames.length];
-    return {
-        id: i + 1,
-        name: name,
-        image: `${401 + i}`,
-        isMicOn: false,
-        isVideoOn: false,
-    };
-});
+const allParticipants = generateParticipants();
 
 export default function Home() {
   const router = useRouter();
   const [isPollPanelOpen, setIsPollPanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("video");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [participants, setParticipants] = useState<Participant[]>(allParticipants);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
@@ -126,6 +128,12 @@ export default function Home() {
   const recordedChunksRef = useRef<Blob[]>([]);
   
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Shuffle participants on the client side to avoid hydration errors
+    const shuffled = [...allParticipants].sort(() => Math.random() - 0.5);
+    setParticipants(shuffled);
+  }, []);
 
   const handleScreenShareToggle = async () => {
     if (viewMode === 'share') {
