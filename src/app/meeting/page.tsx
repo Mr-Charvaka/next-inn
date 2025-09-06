@@ -105,10 +105,9 @@ const participantNames = [
 ];
 
 const generateParticipants = () => {
-    // Shuffle the names to get a random order
     const shuffledNames = [...participantNames].sort(() => Math.random() - 0.5);
 
-    return Array.from({ length: 800 }, (_, i) => {
+    return Array.from({ length: 1000 }, (_, i) => {
         const name = shuffledNames[i % shuffledNames.length];
         return {
             id: i + 1,
@@ -146,7 +145,6 @@ export default function MeetingPage() {
   const otherParticipants = participants.filter(p => p.id !== 0);
 
   useEffect(() => {
-    // Start with the teacher
     const teacher: Participant = {
       id: 0,
       name: "Next Inn Host",
@@ -156,12 +154,28 @@ export default function MeetingPage() {
     };
     setParticipants([teacher]);
 
-    // Delay before participants start joining
     const joinDelay = setTimeout(() => {
-        // Then add other participants over time
         const interval = setInterval(() => {
           setParticipants(prev => {
-            const currentCount = prev.length - 1; // -1 for the teacher
+            const currentCount = prev.length - 1;
+
+            if (currentCount >= 950) {
+              // Fluctuation logic
+              const shouldAdd = Math.random() > 0.5;
+              if (shouldAdd && currentCount < 1000) {
+                const newParticipantCount = Math.floor(Math.random() * 5) + 1;
+                const cappedCount = Math.min(newParticipantCount, 1000 - currentCount);
+                const nextParticipants = allParticipants.slice(currentCount, currentCount + cappedCount);
+                return [...prev, ...nextParticipants];
+              } else if (!shouldAdd && currentCount > 912) {
+                const participantsToRemove = Math.floor(Math.random() * 5) + 1;
+                const cappedCount = Math.max(0, prev.length - participantsToRemove);
+                if (cappedCount <= 912) return prev; // Ensure it doesn't go below 912
+                return prev.slice(0, cappedCount);
+              }
+              return prev; // No change if conditions aren't met
+            }
+
             if (currentCount >= allParticipants.length) {
               clearInterval(interval);
               return prev;
@@ -177,13 +191,11 @@ export default function MeetingPage() {
                 return prev;
             }
           });
-        }, Math.random() * (5000 - 1000) + 1000); // Add participants every 1-5 seconds
-        
-        // Cleanup interval on component unmount
-        return () => clearInterval(interval);
-    }, 120000); // 2 minutes delay
+        }, Math.random() * (2000 - 500) + 500); 
 
-    // Cleanup timeout on component unmount
+        return () => clearInterval(interval);
+    }, 120000); 
+
     return () => clearTimeout(joinDelay);
   }, []);
 
