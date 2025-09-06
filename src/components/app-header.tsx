@@ -9,6 +9,7 @@ import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
 
 type AppHeaderProps = {
+  participantCount: number;
   isRecording: boolean;
   onRecordingToggle: () => void;
   onEndCall: () => void;
@@ -21,8 +22,7 @@ const formatTime = (seconds: number) => {
   return `${h}:${m}:${s}`;
 };
 
-export default function AppHeader({ isRecording, onRecordingToggle, onEndCall }: AppHeaderProps) {
-  const [participantCount, setParticipantCount] = useState(800);
+export default function AppHeader({ participantCount, isRecording, onRecordingToggle, onEndCall }: AppHeaderProps) {
   const [isOnline, setIsOnline] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -57,7 +57,7 @@ export default function AppHeader({ isRecording, onRecordingToggle, onEndCall }:
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 md:px-6 bg-card">
       <div className="flex items-center gap-4">
-        <div className="font-bold text-lg">SimuMeet</div>
+        <div className="font-bold text-lg">Next Inn</div>
         <div className="flex items-center gap-2 cursor-pointer" onClick={onRecordingToggle}>
           <div className={cn("w-3 h-3 rounded-full bg-red-500", isRecording && "animate-pulse")} />
           <span className="text-sm font-medium text-red-500">REC</span>
@@ -109,3 +109,5 @@ export default function AppHeader({ isRecording, onRecordingToggle, onEndCall }:
     </header>
   );
 }
+
+    

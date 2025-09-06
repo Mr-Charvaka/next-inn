@@ -100,19 +100,23 @@ const participantNames = [
 ];
 
 const generateParticipants = () => {
+    // Shuffle the names to get a random order
+    const shuffledNames = [...participantNames].sort(() => Math.random() - 0.5);
+
     return Array.from({ length: 800 }, (_, i) => {
-        const name = participantNames[i % participantNames.length];
+        const name = shuffledNames[i % shuffledNames.length];
         return {
             id: i + 1,
             name: name,
             image: `${401 + i}`,
-            isMicOn: false,
-            isVideoOn: false,
+            isMicOn: Math.random() > 0.5,
+            isVideoOn: Math.random() > 0.5,
         };
     });
 };
 
 const allParticipants = generateParticipants();
+
 
 export default function Home() {
   const router = useRouter();
@@ -129,9 +133,29 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Shuffle participants on the client side to avoid hydration errors
-    const shuffled = [...allParticipants].sort(() => Math.random() - 0.5);
-    setParticipants(shuffled);
+    // Start with the teacher
+    const teacher: Participant = {
+      id: 0,
+      name: "Charvaka",
+      image: '400',
+      isMicOn: true,
+      isVideoOn: true,
+    };
+    setParticipants([teacher]);
+
+    // Then add other participants over time
+    const interval = setInterval(() => {
+      setParticipants(prev => {
+        if (prev.length < allParticipants.length + 1) {
+          const nextParticipant = allParticipants[prev.length -1];
+          return [...prev, nextParticipant];
+        }
+        clearInterval(interval);
+        return prev;
+      });
+    }, Math.random() * (5000 - 1000) + 1000); // Add a participant every 1-5 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleScreenShareToggle = async () => {
@@ -360,6 +384,7 @@ export default function Home() {
     <>
       <div className="flex h-screen w-full flex-col bg-background text-foreground">
         <AppHeader 
+          participantCount={participants.length}
           isRecording={isRecording} 
           onRecordingToggle={handleRecordingToggle}
           onEndCall={handleEndCall}
@@ -426,3 +451,5 @@ export default function Home() {
     </>
   );
 }
+
+    
