@@ -49,9 +49,10 @@ export default function PollPanel() {
             prevPolls.map(p => {
               if (p.id === poll.id && !p.voted) {
                  const randomOptionIndex = Math.floor(Math.random() * p.options.length);
+                 const votesToAdd = Math.floor(Math.random() * 10) + 1;
                  const newOptions = p.options.map((option, index) => {
                    if (index === randomOptionIndex) {
-                     return { ...option, votes: option.votes + 1 };
+                     return { ...option, votes: option.votes + votesToAdd };
                    }
                    return option;
                  });
@@ -205,17 +206,23 @@ export default function PollPanel() {
                         <div key={option.id}>
                             <div className="flex justify-between items-center mb-1 text-sm">
                                 <span className="font-medium">{option.text}</span>
-                                <span className="text-muted-foreground">{option.votes} vote(s)</span>
+                                 <span className="text-muted-foreground">{totalVotes > 0 ? `${votePercentage.toFixed(0)}%` : `0%`} ({option.votes})</span>
                             </div>
                            {poll.voted ? (
                              <Progress value={votePercentage} className="h-3"/>
                            ) : (
-                             <Button size="sm" variant="outline" className="w-full" onClick={() => handleVote(poll.id, option.id)}>Vote</Button>
+                            <div>
+                              <Progress value={votePercentage} className="h-3 mb-2"/>
+                              <Button size="sm" variant="outline" className="w-full" onClick={() => handleVote(poll.id, option.id)}>Vote</Button>
+                            </div>
                            )}
                         </div>
                     );
                   })}
                 </CardContent>
+                 <CardFooter>
+                  <p className="text-xs text-muted-foreground">Total Votes: {totalVotes}</p>
+                </CardFooter>
               </Card>
             )})
           ) : (
