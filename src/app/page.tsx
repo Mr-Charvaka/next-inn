@@ -11,7 +11,7 @@ export default function HomePage() {
           Welcome to <span className="text-primary">Next Inn</span>
         </h1>
         <p className="text-muted-foreground mb-8">
-          Powered by Charvaka School and Major League Hacking, assisting the next generation of innovation and skill development.
+          Powered by Next Inn and Major League Hacking, assisting the next generation of innovation and skill development.
         </p>
         <Button asChild size="lg">
           <Link href="/meeting">

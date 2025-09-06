@@ -137,7 +137,7 @@ export default function MeetingPage() {
     // Start with the teacher
     const teacher: Participant = {
       id: 0,
-      name: "Charvaka",
+      name: "Next Inn Host",
       image: '400',
       isMicOn: true,
       isVideoOn: true,
@@ -461,5 +461,3 @@ export default function MeetingPage() {
     </>
   );
 }
-
-    
