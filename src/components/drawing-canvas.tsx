@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Eraser, Pen, Square, Circle as CircleIcon, Trash2, Redo, Undo, Hand, MousePointer2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
 
 type Tool = 'pen' | 'eraser' | 'rect' | 'circle' | 'hand' | 'select';
 type Point = { x: number; y: number };
@@ -59,7 +60,7 @@ export default function DrawingCanvas() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   
   const [viewOffset, setViewOffset] = useState<Point>({ x: 0, y: 0 });
-  const [startPoint, setStartPoint] = useState<Point | null>(null);
+  const startPointRef = useRef<Point | null>(null);
 
   const [selectedActionIds, setSelectedActionIds] = useState<Set<number>>(new Set());
   const [selectionBox, setSelectionBox] = useState<{start: Point, end: Point} | null>(null);
@@ -88,7 +89,7 @@ export default function DrawingCanvas() {
     context.beginPath();
     context.strokeStyle = action.color;
     if (action.tool === 'eraser') {
-       context.strokeStyle = '#000000';
+        context.strokeStyle = 'hsl(240 10% 3.9%)';
     }
     context.lineWidth = action.lineWidth;
     context.lineCap = 'round';
@@ -156,7 +157,7 @@ export default function DrawingCanvas() {
     const dpr = window.devicePixelRatio || 1;
 
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#000000';
+    context.fillStyle = 'hsl(240 10% 3.9%)';
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     context.save();
@@ -170,7 +171,7 @@ export default function DrawingCanvas() {
     if (selectedActions.length > 0) {
         const selectionBox = getCombinedBoundingBox(selectedActions);
         if (selectionBox) {
-            context.strokeStyle = '#3B82F6';
+            context.strokeStyle = 'hsl(262.1 83.3% 57.8%)';
             context.setLineDash([6, 3]);
             context.lineWidth = 1 * dpr;
             context.strokeRect(selectionBox.minX, selectionBox.minY, selectionBox.maxX - selectionBox.minX, selectionBox.maxY - selectionBox.minY);
@@ -178,16 +179,16 @@ export default function DrawingCanvas() {
             
             // Draw resize handles
             const handles = getResizeHandles(selectionBox);
-            context.fillStyle = '#3B82F6';
+            context.fillStyle = 'hsl(262.1 83.3% 57.8%)';
             Object.values(handles).forEach(h => context.fillRect(h.minX, h.minY, h.maxX - h.minX, h.maxY - h.minY));
         }
     }
     
     // Draw selection box (marquee)
     if (selectionBox) {
-        context.strokeStyle = 'rgba(59, 130, 246, 0.8)';
-        context.fillStyle = 'rgba(59, 130, 246, 0.2)';
-        context.lineWidth = 1;
+        context.strokeStyle = 'rgba(123, 71, 222, 0.8)';
+        context.fillStyle = 'rgba(123, 71, 222, 0.2)';
+        context.lineWidth = 1 * dpr;
         const width = selectionBox.end.x - selectionBox.start.x;
         const height = selectionBox.end.y - selectionBox.start.y;
         context.fillRect(selectionBox.start.x, selectionBox.start.y, width, height);
@@ -232,7 +233,7 @@ export default function DrawingCanvas() {
         const action = history[i];
         const box = getActionBoundingBox(action);
         // Add a small buffer for easier selection of thin lines
-        const buffer = action.lineWidth / 2;
+        const buffer = action.lineWidth / 2 + 5;
         const bufferedBox = { minX: box.minX - buffer, minY: box.minY - buffer, maxX: box.maxX + buffer, maxY: box.maxY + buffer };
         if (isPointInsideBox(point, bufferedBox)) {
             return action;
@@ -244,8 +245,10 @@ export default function DrawingCanvas() {
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.pointerType === 'touch' && tool !== 'hand') return;
     if (event.button !== 0) return; // Only main click
+    event.currentTarget.setPointerCapture(event.pointerId);
+
     const currentPoint = getCanvasCoordinates(event);
-    setStartPoint(currentPoint);
+    startPointRef.current = currentPoint;
 
     if (tool === 'hand') {
         setInteractionMode('panning');
@@ -297,7 +300,9 @@ export default function DrawingCanvas() {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const currentPoint = getCanvasCoordinates(event);
+    const startPoint = startPointRef.current;
     
     if (tool === 'select' && interactionMode === 'none') {
         const selectedActions = history.filter(a => selectedActionIds.has(a.id));
@@ -310,10 +315,8 @@ export default function DrawingCanvas() {
         }
     }
 
-
     if (!startPoint) return;
     
-
     if (interactionMode === 'panning') {
         const dx = currentPoint.x - startPoint.x;
         const dy = currentPoint.y - startPoint.y;
@@ -327,29 +330,30 @@ export default function DrawingCanvas() {
         if (!originalBox || !resizingHandle) return;
 
         let { minX, minY, maxX, maxY } = originalBox;
-
-        // Determine new bounds
+        
         if (resizingHandle.includes('left')) minX = currentPoint.x;
         if (resizingHandle.includes('right')) maxX = currentPoint.x;
         if (resizingHandle.includes('top')) minY = currentPoint.y;
         if (resizingHandle.includes('bottom')) maxY = currentPoint.y;
 
-        const newWidth = maxX - minX;
-        const newHeight = maxY - minY;
+        const newWidth = Math.abs(maxX - minX);
+        const newHeight = Math.abs(maxY - minY);
         const originalWidth = originalBox.maxX - originalBox.minX;
         const originalHeight = originalBox.maxY - originalBox.minY;
 
-        // Avoid division by zero
         if (originalWidth === 0 || originalHeight === 0) return;
 
         const scaleX = newWidth / originalWidth;
         const scaleY = newHeight / originalHeight;
 
+        const finalMinX = Math.min(minX, maxX);
+        const finalMinY = Math.min(minY, maxY);
+
         setHistory(prev => prev.map(action => {
             if (selectedActionIds.has(action.id)) {
                 const newPoints = action.points.map(p => ({
-                    x: minX + (p.x - originalBox.minX) * scaleX,
-                    y: minY + (p.y - originalBox.minY) * scaleY,
+                    x: finalMinX + (p.x - originalBox.minX) * scaleX,
+                    y: finalMinY + (p.y - originalBox.minY) * scaleY,
                 }));
                 return { ...action, points: newPoints };
             }
@@ -364,11 +368,12 @@ export default function DrawingCanvas() {
 
         setHistory(prev => prev.map(action => {
             if (selectedActionIds.has(action.id)) {
-                return { ...action, points: action.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+                const newPoints = action.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                return { ...action, points: newPoints };
             }
             return action;
         }));
-        setStartPoint(currentPoint);
+        startPointRef.current = currentPoint;
         return;
     }
 
@@ -398,6 +403,8 @@ export default function DrawingCanvas() {
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.currentTarget.releasePointerCapture(event.pointerId);
+
     if (interactionMode === 'selecting' && selectionBox) {
         const selectionRect = {
             minX: Math.min(selectionBox.start.x, selectionBox.end.x),
@@ -409,7 +416,6 @@ export default function DrawingCanvas() {
         const idsToSelect = event.shiftKey ? new Set(selectedActionIds) : new Set<number>();
         history.slice(0, historyIndex + 1).forEach(action => {
             const actionBox = getActionBoundingBox(action);
-            // Check for intersection
             if (actionBox.minX < selectionRect.maxX && actionBox.maxX > selectionRect.minX &&
                 actionBox.minY < selectionRect.maxY && actionBox.maxY > selectionRect.minY) {
                 idsToSelect.add(action.id);
@@ -419,7 +425,7 @@ export default function DrawingCanvas() {
     }
     
     setInteractionMode('none');
-    setStartPoint(null);
+    startPointRef.current = null;
     setSelectionBox(null);
     setResizingHandle(null);
   };
@@ -462,29 +468,33 @@ export default function DrawingCanvas() {
   };
 
   return (
-    <div className="w-full h-full bg-card relative overflow-hidden flex flex-col">
-       <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-secondary shadow-md rounded-lg p-1 flex items-center gap-1">
-        <Button variant={tool === 'select' ? 'default' : 'ghost'} size="icon" onClick={() => setTool('select')}><MousePointer2/></Button>
-        <Button variant={tool === 'hand' ? 'default' : 'ghost'} size="icon" onClick={() => setTool('hand')}><Hand/></Button>
-        <Button variant={tool === 'pen' ? 'default' : 'ghost'} size="icon" onClick={() => setTool('pen')}><Pen/></Button>
-        <Button variant={tool === 'rect' ? 'default' : 'ghost'} size="icon" onClick={() => setTool('rect')}><Square/></Button>
-        <Button variant={tool === 'circle' ? 'default' : 'ghost'} size="icon" onClick={() => setTool('circle')}><CircleIcon/></Button>
-        <Button variant={tool === 'eraser' ? 'default' : 'ghost'} size="icon" onClick={() => setTool('eraser')}><Eraser/></Button>
+    <div className="w-full h-full bg-background relative overflow-hidden flex flex-col">
+       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-1">
+        <Button variant={tool === 'select' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('select')}><MousePointer2/></Button>
+        <Button variant={tool === 'hand' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('hand')}><Hand/></Button>
+        <div className="w-px h-8 bg-border mx-1" />
+        <Button variant={tool === 'pen' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('pen')}><Pen/></Button>
+        <Button variant={tool === 'rect' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('rect')}><Square/></Button>
+        <Button variant={tool === 'circle' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('circle')}><CircleIcon/></Button>
+        <Button variant={tool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => setTool('eraser')}><Eraser/></Button>
         <div className="w-px h-8 bg-border mx-1" />
         <Button variant="ghost" size="icon" onClick={undo} disabled={historyIndex < 0}><Undo/></Button>
         <Button variant="ghost" size="icon" onClick={redo} disabled={historyIndex >= history.length - 1}><Redo/></Button>
-        <div className="w-px h-8 bg-border mx-1" />
+        <Button variant="ghost" size="icon" onClick={clearCanvas}><Trash2 className="text-destructive/80"/></Button>
+      </div>
+      
+       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-card shadow-lg border rounded-lg p-1 flex items-center gap-2">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className='w-auto px-2'>
               <div className="w-5 h-5 rounded-full border-2 border-primary-foreground" style={{ backgroundColor: color }} />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-2">
             <div className="flex gap-1">
               {colors.map(c => (
-                <Button key={c} size="icon" variant="ghost" className="w-8 h-8 rounded-full" onClick={() => setColor(c)}>
-                  <div className="w-6 h-6 rounded-full" style={{ backgroundColor: c }} />
+                <Button key={c} size="icon" variant={color === c ? 'secondary' : 'ghost'} className="w-8 h-8 rounded-full" onClick={() => setColor(c)}>
+                  <div className={cn("w-6 h-6 rounded-full", color === c && 'ring-2 ring-offset-2 ring-primary ring-offset-background')} style={{ backgroundColor: c }} />
                 </Button>
               ))}
             </div>
@@ -498,8 +508,6 @@ export default function DrawingCanvas() {
             <Slider defaultValue={[lineWidth]} max={50} step={1} onValueChange={(value) => setLineWidth(value[0])} />
           </PopoverContent>
         </Popover>
-        <div className="w-px h-8 bg-border mx-1" />
-        <Button variant="ghost" size="icon" onClick={clearCanvas}><Trash2/></Button>
       </div>
 
       <canvas
@@ -507,7 +515,7 @@ export default function DrawingCanvas() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp} // End action if pointer leaves canvas
+        onPointerLeave={handlePointerUp}
         style={{ touchAction: 'none', cursor: getCursor() }}
         className="flex-1 w-full h-full"
       />

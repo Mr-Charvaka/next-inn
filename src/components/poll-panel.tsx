@@ -18,6 +18,7 @@ type Poll = {
   id: number;
   question: string;
   options: PollOption[];
+  voted: boolean;
 };
 
 export default function PollPanel() {
@@ -51,6 +52,7 @@ export default function PollPanel() {
         id: Date.now(),
         question: newPollQuestion,
         options: newPollOptions.map((opt, i) => ({ id: i, text: opt, votes: 0 })),
+        voted: false,
       };
       setPolls([newPoll, ...polls]);
       setNewPollQuestion('');
@@ -60,15 +62,14 @@ export default function PollPanel() {
 
   const handleVote = (pollId: number, optionId: number) => {
     setPolls(polls.map(poll => {
-      if (poll.id === pollId) {
-        // In a real app, you'd prevent users from voting multiple times
+      if (poll.id === pollId && !poll.voted) {
         const newOptions = poll.options.map(option => {
           if (option.id === optionId) {
             return { ...option, votes: option.votes + 1 };
           }
           return option;
         });
-        return { ...poll, options: newOptions };
+        return { ...poll, options: newOptions, voted: true };
       }
       return poll;
     }));
@@ -83,13 +84,13 @@ export default function PollPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-full bg-card border-l">
       <div className="border-b p-4 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-foreground">Polls</h2>
       </div>
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          <Card>
+          <Card className="bg-secondary/30">
             <CardHeader>
               <CardTitle className="text-base">Create a New Poll</CardTitle>
             </CardHeader>
@@ -125,19 +126,20 @@ export default function PollPanel() {
           </Card>
 
           {polls.length > 0 ? (
-            polls.map(poll => (
-              <Card key={poll.id}>
+            polls.map(poll => {
+              const totalVotes = getTotalVotes(poll);
+              return (
+              <Card key={poll.id} className="bg-secondary/30">
                 <CardHeader>
                   <CardTitle className="text-base flex justify-between items-center">
                     {poll.question}
                     <Button variant="ghost" size="icon" onClick={() => handleDeletePoll(poll.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-4 w-4 text-destructive/80" />
                     </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {poll.options.map(option => {
-                    const totalVotes = getTotalVotes(poll);
                     const votePercentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
                     return (
                         <div key={option.id}>
@@ -145,16 +147,17 @@ export default function PollPanel() {
                                 <span className="font-medium">{option.text}</span>
                                 <span className="text-muted-foreground">{option.votes} vote(s)</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Progress value={votePercentage} className="flex-1 h-3"/>
-                                <Button size="sm" variant="outline" onClick={() => handleVote(poll.id, option.id)}>Vote</Button>
-                            </div>
+                           {poll.voted ? (
+                             <Progress value={votePercentage} className="h-3"/>
+                           ) : (
+                             <Button size="sm" variant="outline" className="w-full" onClick={() => handleVote(poll.id, option.id)}>Vote</Button>
+                           )}
                         </div>
                     );
                   })}
                 </CardContent>
               </Card>
-            ))
+            )})
           ) : (
             <div className="text-center text-muted-foreground pt-10 flex flex-col items-center">
               <BarChart2 className="h-10 w-10 mb-2" />

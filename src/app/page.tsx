@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import AppHeader from "@/components/app-header";
 import DrawingCanvas from "@/components/drawing-canvas";
 import PollPanel from "@/components/poll-panel";
@@ -11,7 +11,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, MoreHorizontal } from "lucide-react";
+import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, MoreHorizontal, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -26,6 +26,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 type ViewMode = "video" | "draw" | "share";
 
@@ -98,6 +99,7 @@ const participantNames = [
     "Arindam Joshi", "Shraddha Agarwal", "Dilip Agarwal", "Ishana Bansal", "Shakti Bansal", "Chandrika Rathore", "Ravish Rathore", "Smruti Verma", "Subhaan Verma", "Natasha Pillai", "Zaheer Pillai", "Monisha Kulkarni", 
     "Naveen Kulkarni", "Darshita Jadhav", "Shiva Jadhav", "Suman Shetty", "Surya Shetty", "Riya Pawar", "Sanjit Pawar", "Saloni Krishna", "Manas Krishna"
 ];
+
 
 const allParticipants: Participant[] = Array.from({ length: 800 }, (_, i) => {
     const name = participantNames[i % participantNames.length];
@@ -245,7 +247,7 @@ export default function Home() {
   };
   
   const ParticipantCard = ({ participant }: { participant: Participant }) => (
-    <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group">
+    <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group border border-transparent hover:border-primary transition-colors">
       {participant.isVideoOn ? (
         <Image 
           src={`https://picsum.photos/seed/${participant.image}/400/300`} 
@@ -256,9 +258,9 @@ export default function Home() {
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center">
-            <Avatar className="w-24 h-24">
-                <AvatarFallback className="text-3xl bg-primary/20 text-primary">
+        <div className="w-full h-full bg-secondary flex items-center justify-center">
+            <Avatar className="w-24 h-24 text-3xl">
+                <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
                     {participant.name.split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
             </Avatar>
@@ -272,9 +274,9 @@ export default function Home() {
           {participant.isVideoOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
         </Button>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-white text-sm flex items-center gap-2">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-white text-sm flex items-center gap-2 pt-4">
         {participant.isMicOn ? <Mic className="h-4 w-4 text-green-400"/> : <MicOff className="h-4 w-4 text-red-500"/>}
-        <span>{participant.name}</span>
+        <span className="font-medium">{participant.name}</span>
       </div>
     </div>
   );
@@ -288,30 +290,32 @@ export default function Home() {
       case 'video':
       default:
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 h-full overflow-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 p-4 h-full overflow-auto">
             {participants.slice(0, 11).map((p) => (
               <ParticipantCard key={p.id} participant={p} />
             ))}
             <Dialog open={isParticipantListOpen} onOpenChange={setIsParticipantListOpen}>
               <DialogTrigger asChild>
-                <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group cursor-pointer hover:bg-muted">
+                <button className="bg-secondary rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group cursor-pointer hover:bg-primary/10 border-2 border-dashed border-primary/20 hover:border-primary/50 transition-colors">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <MoreHorizontal className="h-10 w-10" />
-                        <span>View More</span>
+                        <Users className="h-10 w-10" />
+                        <span>View All ({participants.length})</span>
                     </div>
-                </div>
+                </button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>All Participants ({participants.length})</DialogTitle>
                 </DialogHeader>
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 -mr-6">
                   <div className="space-y-4 pr-6">
                     {participants.map(p => (
-                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
+                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
                         <div className="flex items-center gap-4">
                           <Avatar>
-                            <AvatarFallback>{p.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                             <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
+                                {p.name.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
                           </Avatar>
                           <span>{p.name}</span>
                         </div>
@@ -344,7 +348,7 @@ export default function Home() {
           onEndCall={handleEndCall}
         />
         <div className="flex flex-1 overflow-hidden">
-          <nav className="flex flex-col items-center gap-4 py-4 px-2 bg-card border-r">
+          <nav className="flex flex-col items-center gap-2 py-4 px-2 bg-card border-r">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -371,7 +375,7 @@ export default function Home() {
                 <TooltipContent side="right"><p>Screen Share</p></TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <div className="mt-auto">
+            <div className="mt-auto flex flex-col gap-2">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -386,8 +390,8 @@ export default function Home() {
           </nav>
           <main className="flex-1 flex flex-col">
             <ResizablePanelGroup direction="horizontal" className="flex-1">
-              <ResizablePanel defaultSize={75}>
-                <div className="flex-1 h-full">
+              <ResizablePanel defaultSize={75} minSize={30}>
+                <div className="flex-1 h-full bg-secondary/30">
                   {renderView()}
                 </div>
               </ResizablePanel>
