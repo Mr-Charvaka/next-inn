@@ -116,7 +116,6 @@ const allParticipants = generateParticipants();
 
 export default function Home() {
   const router = useRouter();
-  const [isPollPanelOpen, setIsPollPanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("video");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -259,6 +258,10 @@ export default function Home() {
   const toggleVideo = (id: number) => {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, isVideoOn: !p.isVideoOn } : p));
   };
+
+  const handleOpenPolls = () => {
+    window.open('/polls', '_blank', 'width=500,height=700,resizable=yes,scrollbars=yes');
+  }
   
   const ParticipantCard = ({ participant }: { participant: Participant }) => (
     <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group border border-transparent hover:border-primary transition-colors">
@@ -361,25 +364,11 @@ export default function Home() {
           onRecordingToggle={handleRecordingToggle}
           onEndCall={handleEndCall}
         />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 flex flex-col">
-            <ResizablePanelGroup direction="horizontal" className="flex-1">
-              <ResizablePanel defaultSize={isPollPanelOpen ? 75 : 100} minSize={30}>
-                <div className="flex-1 h-full bg-secondary/30">
-                  {renderView()}
-                </div>
-              </ResizablePanel>
-              {isPollPanelOpen && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                    <PollPanel />
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-          </main>
-        </div>
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 h-full bg-secondary/30">
+            {renderView()}
+          </div>
+        </main>
 
         <footer className="flex items-center justify-center gap-2 py-2 px-4 bg-card border-t">
             <TooltipProvider>
@@ -410,11 +399,11 @@ export default function Home() {
               <div className="w-px h-8 bg-border mx-4" />
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={isPollPanelOpen ? 'secondary' : 'ghost'} size="lg" onClick={() => setIsPollPanelOpen(!isPollPanelOpen)}>
+                  <Button variant={'ghost'} size="lg" onClick={handleOpenPolls}>
                     <Vote className="h-6 w-6" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top"><p>Toggle Polls</p></TooltipContent>
+                <TooltipContent side="top"><p>Open Polls</p></TooltipContent>
               </Tooltip>
             </TooltipProvider>
         </footer>
