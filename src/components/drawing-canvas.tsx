@@ -28,8 +28,8 @@ export default function DrawingCanvas() {
   }, []);
 
   const saveHistory = useCallback(() => {
-    const canvas = canvasRef.current;
     const context = getCanvasContext();
+    const canvas = canvasRef.current;
     if (!canvas || !context) return;
     
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -37,7 +37,7 @@ export default function DrawingCanvas() {
     setHistory(prevHistory => {
         const newHistory = prevHistory.slice(0, historyIndex + 1);
         if (newHistory.length >= 100) {
-            newHistory.shift();
+            newHistory.shift(); // Keep history size manageable
         }
         newHistory.push(imageData);
         setHistoryIndex(newHistory.length - 1);
@@ -45,17 +45,17 @@ export default function DrawingCanvas() {
     });
   }, [getCanvasContext, historyIndex]);
 
+
   const redrawCanvas = useCallback(() => {
     const context = getCanvasContext();
     const canvas = canvasRef.current;
     if (!context || !canvas) return;
 
-    // Clear canvas
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Redraw from history
     if (historyIndex >= 0 && history[historyIndex]) {
       context.putImageData(history[historyIndex], 0, 0);
+    } else {
+      context.fillStyle = '#000000';
+      context.fillRect(0, 0, canvas.width, canvas.height);
     }
   }, [history, historyIndex, getCanvasContext]);
 
@@ -63,25 +63,27 @@ export default function DrawingCanvas() {
     const canvas = canvasRef.current;
     const context = getCanvasContext();
     if (!canvas || !canvas.parentElement || !context) return;
-    
+
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.parentElement.getBoundingClientRect();
-    
-    // Save current drawing
-    const lastDrawing = historyIndex >= 0 ? history[historyIndex] : null;
+
+    const lastDrawing = history.length > 0 ? context.getImageData(0,0,canvas.width, canvas.height) : null;
 
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     
     context.scale(dpr, dpr);
-
-    if(lastDrawing) {
-        context.putImageData(lastDrawing, 0, 0);
-    }
     
     contextRef.current = context;
 
-  }, [getCanvasContext, history, historyIndex]);
+    if (lastDrawing) {
+      context.putImageData(lastDrawing, 0, 0);
+    } else {
+      context.fillStyle = '#000000';
+      context.fillRect(0, 0, canvas.width/dpr, canvas.height/dpr);
+      saveHistory();
+    }
+}, [getCanvasContext, history, saveHistory]);
 
 
   useEffect(() => {
@@ -92,13 +94,20 @@ export default function DrawingCanvas() {
     };
   }, [resizeCanvas]);
 
+
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       setHistoryIndex(prev => prev - 1);
     } else if (historyIndex === 0) {
       setHistoryIndex(-1);
+       const context = getCanvasContext();
+        const canvas = canvasRef.current;
+        if(context && canvas){
+            context.fillStyle = '#000000';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+        }
     }
-  }, [historyIndex]);
+  }, [historyIndex, getCanvasContext]);
 
   useEffect(() => {
     redrawCanvas();
@@ -110,20 +119,20 @@ export default function DrawingCanvas() {
     }
   }
   
-  const getCoordinates = (event: MouseEvent | Touch | React.MouseEvent | React.TouchEvent) => {
+  const getCoordinates = (event: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-
+    
     let clientX, clientY;
-    if ('touches' in event && event.touches.length > 0) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else if ('changedTouches' in event && event.changedTouches.length > 0) {
-      clientX = event.changedTouches[0].clientX;
-      clientY = event.changedTouches[0].clientY;
+    if ('touches' in event && (event as React.TouchEvent).touches.length > 0) {
+        clientX = (event as React.TouchEvent).touches[0].clientX;
+        clientY = (event as React.TouchEvent).touches[0].clientY;
+    } else if ('changedTouches' in event && (event as React.TouchEvent).changedTouches.length > 0){
+        clientX = (event as React.TouchEvent).changedTouches[0].clientX;
+        clientY = (event as React.TouchEvent).changedTouches[0].clientY;
     }
-    else {
+     else {
       clientX = (event as React.MouseEvent).clientX;
       clientY = (event as React.MouseEvent).clientY;
     }
@@ -142,34 +151,33 @@ export default function DrawingCanvas() {
     if (tool === 'pen' || tool === 'eraser') {
       context.beginPath();
       context.moveTo(x, y);
-      context.strokeStyle = tool === 'eraser' ? 'hsl(var(--card))' : color;
+      context.strokeStyle = tool === 'eraser' ? '#000000' : color;
       context.lineWidth = lineWidth;
       context.lineCap = 'round';
       context.lineJoin = 'round';
-    } else {
-        redrawCanvas();
     }
   };
 
   const finishDrawing = (event: React.MouseEvent | React.TouchEvent) => {
     if(!isDrawing) return;
-    setIsDrawing(false);
     const context = getCanvasContext();
-    if(!context) return;
+    if (!context || !startPos) return;
 
     if (tool === 'pen' || tool === 'eraser') {
-        context.closePath();
+      context.closePath();
+    } else {
+        const { x, y } = getCoordinates(event);
+        drawShape(context, x, y);
     }
     
-    const { x, y } = getCoordinates(event);
-    drawShape(context, x, y);
-    
+    setIsDrawing(false);
     saveHistory();
     setStartPos(null);
   };
   
   const drawShape = (context: CanvasRenderingContext2D, x: number, y: number) => {
       if(!startPos) return;
+      redrawCanvas();
 
       context.fillStyle = color;
       context.strokeStyle = color;
@@ -201,7 +209,6 @@ export default function DrawingCanvas() {
         context.lineTo(x, y);
         context.stroke();
     } else {
-        redrawCanvas();
         drawShape(context, x, y);
     }
   };
@@ -210,9 +217,11 @@ export default function DrawingCanvas() {
     const canvas = canvasRef.current;
     const context = getCanvasContext();
     if (canvas && context) {
-      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#000000';
+      context.fillRect(0, 0, canvas.width, canvas.height);
       setHistory([]);
       setHistoryIndex(-1);
+      saveHistory();
     }
   };
 
@@ -277,3 +286,5 @@ export default function DrawingCanvas() {
     </div>
   );
 }
+
+    
