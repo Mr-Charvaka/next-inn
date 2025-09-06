@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 
 type ViewMode = "video" | "draw" | "share";
@@ -127,9 +128,11 @@ export default function MeetingPage() {
   const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   const { toast } = useToast();
 
@@ -174,6 +177,29 @@ export default function MeetingPage() {
     // Cleanup timeout on component unmount
     return () => clearTimeout(joinDelay);
   }, []);
+
+  useEffect(() => {
+    const getCameraPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({video: true});
+        setHasCameraPermission(true);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
+      }
+    };
+
+    getCameraPermission();
+  }, [toast]);
 
   const handleScreenShareToggle = async () => {
     if (viewMode === 'share') {
@@ -306,7 +332,26 @@ export default function MeetingPage() {
   
   const ParticipantCard = ({ participant }: { participant: Participant }) => (
     <div className="bg-card rounded-lg flex items-center justify-center aspect-video relative overflow-hidden group border border-transparent hover:border-primary transition-colors">
-      {participant.isVideoOn ? (
+      {participant.id === 0 ? (
+        <>
+            <video ref={videoRef} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" autoPlay muted playsInline />
+            {!hasCameraPermission && (
+                 <div className="w-full h-full bg-secondary flex flex-col items-center justify-center gap-2 p-4 text-center">
+                    <Avatar className="w-24 h-24 text-3xl">
+                        <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
+                            {participant.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                    </Avatar>
+                     <Alert variant="destructive" className="mt-4">
+                        <AlertTitle>Camera Access Required</AlertTitle>
+                        <AlertDescription>
+                            Please allow camera access to use this feature.
+                        </AlertDescription>
+                    </Alert>
+                </div>
+            )}
+        </>
+      ) : participant.isVideoOn ? (
         <Image 
           src={`https://picsum.photos/seed/${participant.image}/400/300`} 
           alt={participant.name} 
@@ -486,5 +531,3 @@ export default function MeetingPage() {
     </>
   );
 }
-
-    
