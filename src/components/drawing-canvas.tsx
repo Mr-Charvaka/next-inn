@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -312,6 +313,14 @@ export default function DrawingCanvas() {
             if(!event.shiftKey) setSelectedActionIds(new Set());
             setSelectionBox({ start: currentScreenPoint, end: currentScreenPoint });
         }
+        return;
+    }
+    
+    // Stylus-only drawing logic
+    const isDrawingTool = ['pen', 'eraser', 'rect', 'circle'].includes(tool);
+    if (isDrawingTool && event.pointerType === 'touch') {
+        // If it's a touch event with a drawing tool, don't start drawing.
+        // This allows touch for panning/zooming but not for drawing.
         return;
     }
     
