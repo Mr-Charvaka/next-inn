@@ -367,7 +367,7 @@ export default function MeetingPage() {
       {participant.id === 0 ? (
          <>
          {host?.isVideoOn ? (
-           <video ref={videoRef} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" autoPlay muted playsInline />
+           <video ref={videoRef} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 transform -scale-x-100" autoPlay muted playsInline />
          ) : (
            <Image 
              src="https://i.ibb.co/ynr7K0cz/host.jpg"
