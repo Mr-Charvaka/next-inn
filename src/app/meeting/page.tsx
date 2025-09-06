@@ -181,7 +181,7 @@ export default function MeetingPage() {
         
         // Cleanup interval on component unmount
         return () => clearInterval(interval);
-    }, 360000); // 6 minutes delay
+    }, 120000); // 2 minutes delay
 
     // Cleanup timeout on component unmount
     return () => clearTimeout(joinDelay);
