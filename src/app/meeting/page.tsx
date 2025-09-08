@@ -294,9 +294,19 @@ export default function MeetingPage() {
       ]);
 
       recordedChunksRef.current = [];
-      mediaRecorderRef.current = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm; codecs=vp9'
-      });
+      const options = { mimeType: 'video/mp4; codecs=avc1.42E01E' };
+      const isSupported = MediaRecorder.isTypeSupported(options.mimeType);
+
+      if (!isSupported) {
+        toast({
+          variant: "destructive",
+          title: "Recording Failed",
+          description: "MP4 recording is not supported on this browser.",
+        });
+        return;
+      }
+
+      mediaRecorderRef.current = new MediaRecorder(combinedStream, options);
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -306,12 +316,12 @@ export default function MeetingPage() {
 
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, {
-          type: 'video/webm'
+          type: 'video/mp4'
         });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `NextInn-Recording-${new Date().toISOString()}.webm`;
+        a.download = `NextInn-Recording-${new Date().toISOString()}.mp4`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -642,3 +652,5 @@ export default function MeetingPage() {
     </>
   );
 }
+
+    
