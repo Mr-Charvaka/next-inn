@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Users, Wifi, WifiOff, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,6 @@ type ImageFit = 'cover' | 'contain';
 type AppHeaderProps = {
   participantCount: number;
   isRecording: boolean;
-  onRecordingToggle: () => void;
   onEndCall: () => void;
   imageFit: ImageFit;
   onImageFitChange: (fit: ImageFit) => void;
@@ -26,7 +26,7 @@ const formatTime = (seconds: number) => {
   return `${h}:${m}:${s}`;
 };
 
-export default function AppHeader({ participantCount, isRecording, onRecordingToggle, onEndCall, imageFit, onImageFitChange }: AppHeaderProps) {
+export default function AppHeader({ participantCount, isRecording, onEndCall, imageFit, onImageFitChange }: AppHeaderProps) {
   const [isOnline, setIsOnline] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -62,11 +62,13 @@ export default function AppHeader({ participantCount, isRecording, onRecordingTo
     <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 md:px-6 bg-card">
       <div className="flex items-center gap-4">
         <div className="font-bold text-lg">Next Inn</div>
-        <div className="flex items-center gap-2 cursor-pointer" onClick={onRecordingToggle}>
-          <div className={cn("w-3 h-3 rounded-full bg-red-500", isRecording && "animate-pulse")} />
-          <span className="text-sm font-medium text-red-500">REC</span>
-          <span className="text-sm text-muted-foreground ml-2 tabular-nums">{formatTime(elapsedTime)}</span>
-        </div>
+        {isRecording && (
+          <div className="flex items-center gap-2">
+            <div className={cn("w-3 h-3 rounded-full bg-red-500 animate-pulse")} />
+            <span className="text-sm font-medium text-red-500">REC</span>
+            <span className="text-sm text-muted-foreground ml-2 tabular-nums">{formatTime(elapsedTime)}</span>
+          </div>
+        )}
       </div>
       
       <div className="flex items-center gap-4">
@@ -121,3 +123,5 @@ export default function AppHeader({ participantCount, isRecording, onRecordingTo
     </header>
   );
 }
+
+    

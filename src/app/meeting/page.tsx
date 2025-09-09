@@ -12,7 +12,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users, LayoutGrid, UserSquare } from "lucide-react";
+import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users, LayoutGrid, UserSquare, Dot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -159,22 +159,20 @@ export default function MeetingPage() {
           setParticipants(prev => {
             const currentCount = prev.length - 1;
 
-            // Fluctuation logic when participant count is high
             if (currentCount >= 912) {
               const shouldAdd = Math.random() > 0.5;
               if (shouldAdd && currentCount < 1000) {
-                const newParticipantCount = Math.floor(Math.random() * 2) + 1; // Add 1 or 2
+                const newParticipantCount = Math.floor(Math.random() * 2) + 1;
                 const cappedCount = Math.min(newParticipantCount, 1000 - currentCount);
                 const nextParticipants = allParticipants.slice(currentCount, currentCount + cappedCount);
                 return [...prev, ...nextParticipants];
               } else if (!shouldAdd && currentCount > 912) {
-                const participantsToRemove = Math.floor(Math.random() * 2) + 1; // Remove 1 or 2
+                const participantsToRemove = Math.floor(Math.random() * 2) + 1;
                 return prev.slice(0, prev.length - participantsToRemove);
               }
-              return prev; // No change if conditions aren't met
+              return prev;
             }
 
-            // Normal joining logic
             if (currentCount >= allParticipants.length) {
               clearInterval(interval);
               return prev;
@@ -244,19 +242,30 @@ export default function MeetingPage() {
 
   const handleScreenShareToggle = async () => {
     if (viewMode === 'share') {
+      // Stop screen sharing
       screenStream?.getTracks().forEach((track) => track.stop());
       setScreenStream(null);
+      if (isRecording) {
+        stopRecording();
+      }
       setViewMode('video');
     } else {
+      // Start screen sharing
       try {
-        // For iPad/Safari, do not request audio, as it's not supported with getDisplayMedia
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
+          audio: false, // Explicitly false for better iPad compatibility
         });
+        
+        // Listener to stop sharing when browser control is used
         stream.getVideoTracks()[0].onended = () => {
             setScreenStream(null);
+            if (isRecording) {
+              stopRecording();
+            }
             setViewMode('video');
         };
+        
         setScreenStream(stream);
         setViewMode('share');
       } catch (error) {
@@ -271,23 +280,26 @@ export default function MeetingPage() {
     }
   };
 
-  const handleRecordingToggle = () => {
+  const handleRecordingToggle = async () => {
     if (isRecording) {
       stopRecording();
     } else {
-      startRecording();
+      // Recording can only start if screen is being shared
+      if (screenStream) {
+        await startRecording(screenStream);
+      } else {
+        toast({
+            variant: "destructive",
+            title: "Recording Failed",
+            description: "You must be sharing your screen to start a recording.",
+        });
+      }
     }
   };
 
-  const startRecording = async () => {
+  const startRecording = async (displayStream: MediaStream) => {
     try {
-      // For iPad/Safari, do not request audio with getDisplayMedia
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false 
-      });
-      
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
       const combinedStream = new MediaStream([
         ...displayStream.getVideoTracks(),
@@ -295,19 +307,19 @@ export default function MeetingPage() {
       ]);
 
       recordedChunksRef.current = [];
-      // Use a more generic mimeType that's better supported on Safari
+      
       const options = { mimeType: 'video/mp4' };
       const isSupported = MediaRecorder.isTypeSupported(options.mimeType);
 
       if (!isSupported) {
-        toast({
-          variant: "destructive",
-          title: "Recording Failed",
-          description: "MP4 recording is not supported on this browser. Try a different format.",
-        });
-        return;
+          toast({
+              variant: "destructive",
+              title: "Recording Not Supported",
+              description: "MP4 recording is not supported on this browser.",
+          });
+          return;
       }
-
+      
       mediaRecorderRef.current = new MediaRecorder(combinedStream, options);
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -317,9 +329,7 @@ export default function MeetingPage() {
       };
 
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, {
-          type: 'video/mp4'
-        });
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/mp4' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -332,6 +342,8 @@ export default function MeetingPage() {
           title: "Recording Saved",
           description: "Your recording has been downloaded.",
         });
+        // Stop audio tracks after recording is done
+        audioStream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorderRef.current.start();
@@ -346,7 +358,7 @@ export default function MeetingPage() {
       toast({
         variant: "destructive",
         title: "Recording Failed",
-        description: "Could not start recording. Please check permissions.",
+        description: "Could not start recording. Please check microphone permissions.",
       });
     }
   };
@@ -354,8 +366,8 @@ export default function MeetingPage() {
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
+    // We don't stop the tracks here anymore, onstop handles audio, and onended handles video
     setIsRecording(false);
   };
 
@@ -471,7 +483,6 @@ export default function MeetingPage() {
       );
     }
     
-    // Speaker view
     return (
        <ResizablePanelGroup direction="horizontal" className="h-full w-full">
           <ResizablePanel defaultSize={75}>
@@ -548,6 +559,16 @@ export default function MeetingPage() {
         </ResizablePanelGroup>
     );
   }
+  
+  const renderHeaderControls = () => (
+    <AppHeader 
+      participantCount={participants.length}
+      isRecording={isRecording} 
+      onEndCall={handleEndCall}
+      imageFit={imageFit}
+      onImageFitChange={setImageFit}
+    />
+  );
 
   const renderView = () => {
     switch(viewMode) {
@@ -564,14 +585,7 @@ export default function MeetingPage() {
   return (
     <>
       <div className="flex h-screen w-full flex-col bg-background text-foreground">
-        <AppHeader 
-          participantCount={participants.length}
-          isRecording={isRecording} 
-          onRecordingToggle={handleRecordingToggle}
-          onEndCall={handleEndCall}
-          imageFit={imageFit}
-          onImageFitChange={setImageFit}
-        />
+        {renderHeaderControls()}
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 h-full bg-secondary/30">
             {renderView()}
@@ -582,7 +596,7 @@ export default function MeetingPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('video')}>
+                  <Button variant={viewMode === 'video' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('video')} disabled={viewMode==='share'}>
                     <Video className="h-6 w-6" />
                   </Button>
                 </TooltipTrigger>
@@ -610,7 +624,7 @@ export default function MeetingPage() {
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('draw')}>
+                  <Button variant={viewMode === 'draw' ? 'secondary' : 'ghost'} size="lg" onClick={() => setViewMode('draw')} disabled={viewMode==='share'}>
                     <Edit3 className="h-6 w-6" />
                   </Button>
                 </TooltipTrigger>
@@ -622,8 +636,26 @@ export default function MeetingPage() {
                     <ScreenShare className="h-6 w-6" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top"><p>Screen Share</p></TooltipContent>
+                <TooltipContent side="top"><p>{viewMode === 'share' ? 'Stop Sharing' : 'Screen Share'}</p></TooltipContent>
               </Tooltip>
+
+              {viewMode === 'share' && (
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant={isRecording ? 'destructive' : 'outline'} 
+                        size="lg" 
+                        onClick={handleRecordingToggle} 
+                        className="w-32"
+                      >
+                         {isRecording ? <Dot className="animate-ping absolute h-4 w-4" /> : null}
+                         {isRecording ? 'Stop' : 'Record'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>{isRecording ? 'Stop Recording' : 'Start Recording'}</p></TooltipContent>
+                  </Tooltip>
+              )}
+
               <div className="w-px h-8 bg-border mx-4" />
               <Tooltip>
                 <TooltipTrigger asChild>
