@@ -281,9 +281,10 @@ export default function MeetingPage() {
 
   const startRecording = async () => {
     try {
+      // For iPad/Safari, do not request audio with getDisplayMedia
       const displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { mediaSource: "screen" } as any,
-        audio: true,
+        video: true,
+        audio: false 
       });
       
       const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -294,14 +295,15 @@ export default function MeetingPage() {
       ]);
 
       recordedChunksRef.current = [];
-      const options = { mimeType: 'video/mp4; codecs=avc1.42E01E' };
+      // Use a more generic mimeType that's better supported on Safari
+      const options = { mimeType: 'video/mp4' };
       const isSupported = MediaRecorder.isTypeSupported(options.mimeType);
 
       if (!isSupported) {
         toast({
           variant: "destructive",
           title: "Recording Failed",
-          description: "MP4 recording is not supported on this browser.",
+          description: "MP4 recording is not supported on this browser. Try a different format.",
         });
         return;
       }
@@ -652,5 +654,3 @@ export default function MeetingPage() {
     </>
   );
 }
-
-    
