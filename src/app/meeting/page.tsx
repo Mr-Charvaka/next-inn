@@ -254,7 +254,7 @@ export default function MeetingPage() {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: false, // Explicitly false for better iPad compatibility
+          audio: false, 
         });
         
         // Listener to stop sharing when browser control is used
@@ -518,7 +518,7 @@ export default function MeetingPage() {
                               <Avatar>
                                  <AvatarFallback className="bg-primary/20 text-primary-foreground/80">
                                     {p.name.split(' ').map(n => n[0]).join('')}
-                                </AvatarFallback>
+                                 </AvatarFallback>
                               </Avatar>
                               <span>{p.name}</span>
                             </div>
@@ -686,5 +686,3 @@ export default function MeetingPage() {
     </>
   );
 }
-
-    
