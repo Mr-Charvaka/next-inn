@@ -12,7 +12,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users, LayoutGrid, UserSquare, Dot } from "lucide-react";
+import { Video, Edit3, Vote, ScreenShare, Mic, MicOff, VideoOff, Users, LayoutGrid, UserSquare, Dot, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -308,14 +308,14 @@ export default function MeetingPage() {
 
       recordedChunksRef.current = [];
       
-      const options = { mimeType: 'video/mp4' };
+      const options = { mimeType: 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"' };
       const isSupported = MediaRecorder.isTypeSupported(options.mimeType);
 
       if (!isSupported) {
           toast({
               variant: "destructive",
               title: "Recording Not Supported",
-              description: "MP4 recording is not supported on this browser.",
+              description: "MP4 recording with H.264/AAC is not supported on this browser.",
           });
           return;
       }
@@ -648,7 +648,7 @@ export default function MeetingPage() {
                         onClick={handleRecordingToggle} 
                         className="w-32"
                       >
-                         {isRecording ? <Dot className="animate-ping absolute h-4 w-4" /> : null}
+                         <Radio className={cn("mr-2 h-4 w-4", isRecording && "animate-pulse")} />
                          {isRecording ? 'Stop' : 'Record'}
                       </Button>
                     </TooltipTrigger>
